@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#6200EE</color>
+    <string name="app_name">Live Media Activities</string>
+    <string name="enable_notification_access">Enable Notification Access</string>
+    <string name="permission_required">Permission Required</string>
+    <string name="select_apps">Select Media Apps</string>
+    <string name="service_name">Media Activity Listener</string>
+    <style name="RoundedIcon">
+        <item name="android:clipToOutline">true</item>
+        <item name="android:outlineProvider">background</item>
+    </style>
+    <style name="Theme.LiveMediaActivities" parent="android:Theme.Material.Light.NoActionBar"/>
+</resources>

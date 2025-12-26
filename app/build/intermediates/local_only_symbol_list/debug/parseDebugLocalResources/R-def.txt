@@ -1,0 +1,24 @@
+R_DEF: Internal format may change without notice
+local
+color ic_launcher_background
+drawable ic_audio_wave
+drawable ic_launcher_foreground
+drawable ic_pause
+id action_next
+id action_play_pause
+id action_prev
+id notification_artist
+id notification_icon
+id notification_title
+layout notification_live_activity
+mipmap ic_launcher
+mipmap ic_launcher_round
+string app_name
+string enable_notification_access
+string permission_required
+string select_apps
+string service_name
+style RoundedIcon
+style Theme.LiveMediaActivities
+xml backup_rules
+xml data_extraction_rules
