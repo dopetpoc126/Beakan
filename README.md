@@ -1,10 +1,10 @@
 # Beakan
 
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.0-purple.svg?style=flat&logo=kotlin)](https://kotlinlang.org)
-[![API](https://img.shields.io/badge/API-26%2B-brightgreen.svg?style=flat&logo=android)](https://android-arsenal.com/api?level=36)
+[![API](https://img.shields.io/badge/API-26%2B-brightgreen.svg?style=flat&logo=android)](https://android-arsenal.com/api?level=26)
 [![Service](https://img.shields.io/badge/Architecture-Service%20Layer-orange.svg?style=flat&logo=android)](https://developer.android.com/guide/components/services)
 
-**Beakan** brings iOS-style **Live Activities** to Android via the **Live Updates API** introduced in Android 16. It's a background service that catches specific notifications—like 2FA codes, downloads, and music—and promotes them into a unified, persistent status chip at the top of the screen.
+**Beakan** brings iOS-style **Live Activities** to Android. It's a background service that catches specific notifications—like 2FA codes, downloads, and music—and promotes them into a unified, persistent status chip at the top of the screen.
 
 ---
 
@@ -46,23 +46,6 @@ For 2FA codes, we run a local parser on notification text.
 ### 3. State Manager (`LiveActivityManager`)
 This component decides what to show when multiple things happen at once.
 
-```mermaid
-stateDiagram-v2
-    [*] --> Idle
-    
-    Idle --> Media: Playback Started (P2)
-    Media --> Download: Download Started (P1)
-    
-    Download --> OTP: 2FA Code Received (P0)
-    Media --> OTP: 2FA Code Received (P0)
-    
-    OTP --> Download: 30s Timeout / Dismiss
-    OTP --> Media: 30s Timeout / Dismiss
-    
-    Download --> Media: Download Complete
-    Media --> Idle: Session End
-```
-
 | Priority | Type | Behavior |
 | :--- | :--- | :--- |
 | **P0** | **OTP / 2FA** | Highest priority. Shows up immediately, then auto-dismisses after 30s. |
@@ -82,12 +65,12 @@ We don't just scrape the notification title. Beakan looks for a `MediaSession` t
 | **Media** | `MediaSessionCompat` / `MediaController` |
 | **Parsing** | Standard Java Regex |
 | **State** | Kotlin Singletons |
-| **Min SDK** | Android 16.0 (API 36) |
+| **Min SDK** | Android 15 QPR / 16 (API 35+) |
 
 ## Setup
 
 ### Prerequisites
--   Android 16.0+ device or emulator.
+-   Android 16 (Developer Preview) or Android 15 QPR device/emulator.
 -   **Manual Step**: You must grant "Notification Access" in system settings when the app asks.
 
 ### Install
