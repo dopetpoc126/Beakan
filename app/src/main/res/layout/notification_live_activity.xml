@@ -8,13 +8,13 @@
     android:gravity="center_vertical"
     android:background="@android:color/transparent">
 
-    <!-- Album Art / Icon -->
+    <!-- Album Art / Icon - BIGGER -->
     <ImageView
         android:id="@+id/notification_icon"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
         android:scaleType="centerCrop"
-        android:background="#DDDDDD"
+        android:background="#222222"
         android:src="@drawable/ic_launcher_foreground"
         android:contentDescription="Album Art"
         style="@style/RoundedIcon" />
@@ -24,7 +24,7 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:orientation="vertical"
-        android:paddingStart="12dp"
+        android:paddingStart="14dp"
         android:paddingEnd="8dp">
 
         <TextView
@@ -32,7 +32,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Song Title"
-            android:textSize="14sp"
+            android:textSize="15sp"
             android:textStyle="bold"
             android:textColor="#000000"
             android:ellipsize="end"
@@ -44,36 +44,51 @@
             android:layout_height="wrap_content"
             android:text="Artist Name"
             android:textSize="12sp"
-            android:textColor="#666666"
+            android:textColor="#555555"
             android:ellipsize="end"
-            android:maxLines="1" />
+            android:maxLines="1"
+            android:layout_marginBottom="6dp" />
+
+        <!-- FUNKY THICK PROGRESS BAR -->
+        <ProgressBar
+            android:id="@+id/media_progress"
+            style="@android:style/Widget.ProgressBar.Horizontal"
+            android:layout_width="match_parent"
+            android:layout_height="8dp"
+            android:max="1000"
+            android:progress="300"
+            android:progressDrawable="@drawable/progress_bar_funky"
+            android:background="@drawable/progress_bar_bg" />
+
     </LinearLayout>
 
-    <!-- Controls (Simplified for Custom View) -->
-    <!-- Note: Actual buttons need PendingIntents wired up code-side -->
+    <!-- Controls -->
     <ImageView
         android:id="@+id/action_prev"
-        android:layout_width="32dp"
-        android:layout_height="32dp"
-        android:padding="4dp"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:padding="6dp"
         android:src="@android:drawable/ic_media_previous"
-        android:contentDescription="Previous" />
+        android:contentDescription="Previous"
+        android:background="?android:attr/selectableItemBackgroundBorderless" />
 
     <ImageView
         android:id="@+id/action_play_pause"
-        android:layout_width="36dp"
-        android:layout_height="36dp"
-        android:padding="2dp"
-        android:layout_marginHorizontal="8dp"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:padding="4dp"
+        android:layout_marginHorizontal="4dp"
         android:src="@android:drawable/ic_media_play"
-        android:contentDescription="Play" />
+        android:contentDescription="Play"
+        android:background="?android:attr/selectableItemBackgroundBorderless" />
 
     <ImageView
         android:id="@+id/action_next"
-        android:layout_width="32dp"
-        android:layout_height="32dp"
-        android:padding="4dp"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:padding="6dp"
         android:src="@android:drawable/ic_media_next"
-        android:contentDescription="Next" />
+        android:contentDescription="Next"
+        android:background="?android:attr/selectableItemBackgroundBorderless" />
 
 </LinearLayout>

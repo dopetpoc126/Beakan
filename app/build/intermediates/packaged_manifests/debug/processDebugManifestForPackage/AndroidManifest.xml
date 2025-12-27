@@ -12,8 +12,6 @@
     <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
-    <!-- Required to see what other apps are installed -->
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
 
     <permission
         android:name="com.example.livemedia.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
@@ -32,7 +30,6 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:testOnly="true"
         android:theme="@style/Theme.LiveMediaActivities" >
         <activity
             android:name="com.example.livemedia.MainActivity"

@@ -2,6 +2,7 @@ package com.example.livemedia
 
 import android.app.Notification
 import android.graphics.Bitmap
+import android.graphics.drawable.BitmapDrawable
 import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.MediaSession
@@ -13,6 +14,9 @@ import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import kotlin.math.abs
 
+/**
+ * Listens for media notifications and creates live update notifications.
+ */
 class MediaNotificationListener : NotificationListenerService() {
 
     private lateinit var publisher: NotificationPublisher
@@ -21,29 +25,45 @@ class MediaNotificationListener : NotificationListenerService() {
     private var activeToken: MediaSession.Token? = null
     private var activeController: MediaController? = null
     private var currentSongId: Int = NotificationPublisher.BASE_NOTIFICATION_ID
-    private var lastTitle: String? = null
     private var cachedActions: List<Notification.Action> = emptyList()
     private var cachedLargeIcon: Bitmap? = null
     
     private val handler = Handler(Looper.getMainLooper())
     private var pendingUpdate = false
     private var lastIsPlaying: Boolean? = null
+    
+    companion object {
+        private const val PROGRESS_UPDATE_INTERVAL_MS = 1000L
+        private const val UPDATE_DEBOUNCE_MS = 800L
+        private const val SOURCE_SWITCH_DELAY_MS = 300L
+    }
+    
+    private val progressUpdateRunnable = object : Runnable {
+        override fun run() {
+            if (isPlaying(activeController?.playbackState)) {
+                doPost()
+                handler.postDelayed(this, PROGRESS_UPDATE_INTERVAL_MS)
+            }
+        }
+    }
 
     private val controllerCallback = object : MediaController.Callback() {
         override fun onPlaybackStateChanged(state: PlaybackState?) {
-            val newIsPlaying = state?.state == PlaybackState.STATE_PLAYING || 
-                               state?.state == PlaybackState.STATE_BUFFERING
+            val newIsPlaying = isPlaying(state)
+            val wasPlaying = lastIsPlaying
+            lastIsPlaying = newIsPlaying
             
-            if (lastIsPlaying != null && lastIsPlaying != newIsPlaying) {
-                lastIsPlaying = newIsPlaying
+            if (wasPlaying != newIsPlaying) {
                 refreshActionsFromSource()
                 handler.post { doPost() }
+                if (newIsPlaying) startProgressUpdates() else stopProgressUpdates()
             } else {
-                lastIsPlaying = newIsPlaying
                 scheduleUpdate()
             }
         }
-        override fun onMetadataChanged(metadata: MediaMetadata?) { scheduleUpdate() }
+        
+        override fun onMetadataChanged(metadata: MediaMetadata?) = scheduleUpdate()
+        
         override fun onSessionDestroyed() {
             handler.post { 
                 releaseController()
@@ -55,11 +75,11 @@ class MediaNotificationListener : NotificationListenerService() {
     
     private fun refreshActionsFromSource() {
         val pkg = activeSourcePackage ?: return
-        try {
+        runCatching {
             activeNotifications?.find { it.packageName == pkg }?.let { sbn ->
                 cachedActions = sbn.notification.actions?.toList() ?: emptyList()
             }
-        } catch (e: Exception) { /* ignore */ }
+        }
     }
     
     private fun scheduleUpdate() {
@@ -68,7 +88,7 @@ class MediaNotificationListener : NotificationListenerService() {
             handler.postDelayed({
                 pendingUpdate = false
                 postNotification()
-            }, 800)
+            }, UPDATE_DEBOUNCE_MS)
         }
     }
 
@@ -83,32 +103,24 @@ class MediaNotificationListener : NotificationListenerService() {
     }
 
     private fun findActiveMedia() {
-        val prefs = AppPreferences(this)
-        val selectedPackages = prefs.getSelectedPackages()
         val notifications = activeNotifications ?: return
         
-        // First pass: find any playing media
-        for (sbn in notifications) {
-            if (!isMediaNotification(sbn)) continue
-            if (selectedPackages.isNotEmpty() && !selectedPackages.contains(sbn.packageName)) continue
-            
-            val token = getToken(sbn) ?: continue
-            val controller = MediaController(this, token)
-            if (isPlaying(controller.playbackState)) {
+        // First pass: find playing media
+        notifications.asSequence()
+            .filter { isMediaNotification(it) }
+            .mapNotNull { sbn -> getToken(sbn)?.let { sbn to it } }
+            .find { (sbn, token) -> isPlaying(MediaController(this, token).playbackState) }
+            ?.let { (sbn, token) -> 
                 switchToSource(sbn, token)
                 return
             }
-        }
         
-        // Second pass: take first available media if nothing is playing
-        for (sbn in notifications) {
-            if (!isMediaNotification(sbn)) continue
-            if (selectedPackages.isNotEmpty() && !selectedPackages.contains(sbn.packageName)) continue
-            
-            val token = getToken(sbn) ?: continue
-            switchToSource(sbn, token)
-            return
-        }
+        // Second pass: take first available media
+        notifications.asSequence()
+            .filter { isMediaNotification(it) }
+            .mapNotNull { sbn -> getToken(sbn)?.let { sbn to it } }
+            .firstOrNull()
+            ?.let { (sbn, token) -> switchToSource(sbn, token) }
     }
 
     private fun isMediaNotification(sbn: StatusBarNotification): Boolean {
@@ -131,13 +143,8 @@ class MediaNotificationListener : NotificationListenerService() {
         if (sbn.packageName == packageName) return
         if (!isMediaNotification(sbn)) return
         
-        val prefs = AppPreferences(this)
-        val selectedPackages = prefs.getSelectedPackages()
-        if (selectedPackages.isNotEmpty() && !selectedPackages.contains(sbn.packageName)) return
-        
         val token = getToken(sbn) ?: return
-        val isNewSourcePlaying = MediaController(this, token).let { isPlaying(it.playbackState) }
-        val isCurrentPlaying = isPlaying(activeController?.playbackState)
+        val isNewSourcePlaying = isPlaying(MediaController(this, token).playbackState)
         
         when {
             sbn.packageName == activeSourcePackage -> {
@@ -145,8 +152,6 @@ class MediaNotificationListener : NotificationListenerService() {
                 updateLargeIcon(sbn)
                 scheduleUpdate()
             }
-            // Always switch if new source is playing (user intent to play new media), 
-            // even if current source hasn't reported 'paused' yet (fixes 2s lag).
             activeSourcePackage == null || isNewSourcePlaying -> {
                 switchToSource(sbn, token)
             }
@@ -157,10 +162,9 @@ class MediaNotificationListener : NotificationListenerService() {
         if (sbn.packageName == activeSourcePackage) {
             releaseController()
             activeSourcePackage = null
-            lastTitle = null
             lastIsPlaying = null
             publisher.cancelNotification()
-            handler.postDelayed({ findActiveMedia() }, 300)
+            handler.postDelayed({ findActiveMedia() }, SOURCE_SWITCH_DELAY_MS)
         }
     }
     
@@ -172,7 +176,6 @@ class MediaNotificationListener : NotificationListenerService() {
         cachedActions = sbn.notification.actions?.toList() ?: emptyList()
         updateLargeIcon(sbn)
         lastIsPlaying = null
-        lastTitle = null
         currentSongId = NotificationPublisher.BASE_NOTIFICATION_ID
         
         activeController = MediaController(this, token).apply {
@@ -180,20 +183,34 @@ class MediaNotificationListener : NotificationListenerService() {
         }
         
         doPost()
+        
+        if (isPlaying(activeController?.playbackState)) {
+            startProgressUpdates()
+        }
+    }
+    
+    private fun startProgressUpdates() {
+        handler.removeCallbacks(progressUpdateRunnable)
+        handler.postDelayed(progressUpdateRunnable, PROGRESS_UPDATE_INTERVAL_MS)
+    }
+    
+    private fun stopProgressUpdates() {
+        handler.removeCallbacks(progressUpdateRunnable)
     }
     
     private fun updateLargeIcon(sbn: StatusBarNotification) {
-        try {
+        runCatching {
             sbn.notification.getLargeIcon()?.let { icon ->
-                (icon.loadDrawable(this) as? android.graphics.drawable.BitmapDrawable)?.let {
+                (icon.loadDrawable(this) as? BitmapDrawable)?.let {
                     cachedLargeIcon = it.bitmap
                 }
             }
-        } catch (e: Exception) { /* ignore */ }
+        }
     }
 
     private fun releaseController() {
-        try { activeController?.unregisterCallback(controllerCallback) } catch (e: Exception) {}
+        stopProgressUpdates()
+        runCatching { activeController?.unregisterCallback(controllerCallback) }
         activeController = null
         activeToken = null
     }
@@ -202,47 +219,45 @@ class MediaNotificationListener : NotificationListenerService() {
         state?.state == PlaybackState.STATE_PLAYING || state?.state == PlaybackState.STATE_BUFFERING
 
     private fun postNotification() {
-        val pkg = activeSourcePackage ?: return
-        val controller = activeController
-        val metadata = controller?.metadata
-        val isPlaying = isPlaying(controller?.playbackState)
-
-        val title = metadata?.getString(MediaMetadata.METADATA_KEY_TITLE)
-            ?: metadata?.getString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE)
+        val metadata = activeController?.metadata ?: return
+        
+        val title = metadata.getString(MediaMetadata.METADATA_KEY_TITLE)
+            ?: metadata.getString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE)
         
         if (title.isNullOrBlank() || title == "Audio") {
             publisher.cancelNotification()
             return
         }
 
-        val newSongId = NotificationPublisher.BASE_NOTIFICATION_ID + abs(title.hashCode() % 10000)
-        currentSongId = newSongId
-        lastTitle = title
+        currentSongId = NotificationPublisher.BASE_NOTIFICATION_ID + abs(title.hashCode() % 10000)
         doPost()
     }
     
     private fun doPost() {
         val pkg = activeSourcePackage ?: return
-        val metadata = activeController?.metadata
-        val isPlaying = isPlaying(activeController?.playbackState)
+        val metadata = activeController?.metadata ?: return
+        val playbackState = activeController?.playbackState
 
-        val title = metadata?.getString(MediaMetadata.METADATA_KEY_TITLE)
-            ?: metadata?.getString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE)
+        val title = metadata.getString(MediaMetadata.METADATA_KEY_TITLE)
+            ?: metadata.getString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE)
             ?: "Audio"
-        val artist = metadata?.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: ""
-        val art = metadata?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
-            ?: metadata?.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON)
+        val artist = metadata.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: ""
+        val art = metadata.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
+            ?: metadata.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON)
             ?: cachedLargeIcon
-
+        
         publisher.updateNotification(
             notificationId = currentSongId,
             title = title,
             artist = artist,
             bitmap = art,
             token = activeToken,
-            isPlaying = isPlaying,
+            isPlaying = isPlaying(playbackState),
             actions = cachedActions,
-            sourcePackage = pkg
+            sourcePackage = pkg,
+            launchIntent = activeNotifications?.find { it.packageName == pkg }?.notification?.contentIntent,
+            duration = metadata.getLong(MediaMetadata.METADATA_KEY_DURATION),
+            position = playbackState?.position ?: 0L
         )
     }
 

@@ -3,10 +3,14 @@ local
 color ic_launcher_background
 drawable ic_audio_wave
 drawable ic_launcher_foreground
+drawable ic_launcher_monochrome
 drawable ic_pause
+drawable progress_bar_bg
+drawable progress_bar_funky
 id action_next
 id action_play_pause
 id action_prev
+id media_progress
 id notification_artist
 id notification_icon
 id notification_title

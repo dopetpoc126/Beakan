@@ -1,0 +1,26 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Pill Shape with Wave Cutout -->
+    <!-- Used evenOdd fillType to subtract the inner wave shapes from the pill -->
+    <path
+        android:fillColor="#FF000000"
+        android:fillType="evenOdd"
+        android:pathData="
+        M24,54 C24,42.95 32.95,34 44,34 H64 C75.05,34 84,42.95 84,54 C84,65.05 75.05,74 64,74 H44 C32.95,74 24,65.05 24,54 Z
+        
+        M36,54 A2,2 0 0 1 40,54 A2,2 0 0 1 36,54 Z
+        
+        M44,48 A2,2 0 0 1 48,48 V60 A2,2 0 0 1 44,60 Z
+        
+        M52,44 A2,2 0 0 1 56,44 V64 A2,2 0 0 1 52,64 Z
+        
+        M60,48 A2,2 0 0 1 64,48 V60 A2,2 0 0 1 60,60 Z
+        
+        M68,54 A2,2 0 0 1 72,54 A2,2 0 0 1 68,54 Z
+        " />
+        
+</vector>

@@ -58,6 +58,7 @@ drawable ic_call_answer_video_low
 drawable ic_call_decline
 drawable ic_call_decline_low
 drawable ic_launcher_foreground
+drawable ic_launcher_monochrome
 drawable ic_pause
 drawable notification_action_background
 drawable notification_bg
@@ -72,6 +73,8 @@ drawable notification_template_icon_bg
 drawable notification_template_icon_low_bg
 drawable notification_tile_bg
 drawable notify_panel_notification_icon_bg
+drawable progress_bar_bg
+drawable progress_bar_funky
 id accessibility_action_clickable_span
 id accessibility_custom_action_0
 id accessibility_custom_action_1
@@ -137,6 +140,7 @@ id line1
 id line3
 id media_actions
 id media_controller_compat_view_tag
+id media_progress
 id normal
 id notification_artist
 id notification_background

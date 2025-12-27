@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Live Media Activities</string>
+    <string name="app_name">Beakan</string>
     <string name="service_name">Media Activity Listener</string>
     <string name="permission_required">Permission Required</string>
     <string name="enable_notification_access">Enable Notification Access</string>
