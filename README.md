@@ -87,7 +87,7 @@ We don't just scrape the notification title. Beakan looks for a `MediaSession` t
 ## Setup
 
 ### Prerequisites
--   Android 8.0+ device or emulator.
+-   Android 16.0+ device or emulator.
 -   **Manual Step**: You must grant "Notification Access" in system settings when the app asks.
 
 ### Install
