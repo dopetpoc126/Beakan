@@ -94,11 +94,11 @@ On first launch, the application will guide you to grant **Notification Listener
 
 > This permission is mandatory for the `NotificationListenerService` to function. The application only reads metadata from `MediaStyle` notifications; no other notification content is accessed or stored.
 
-## Demonstration
+<!--## Demonstration
 
 | Configuration Screen | Live Update in Action |
 |:--------------------:|:---------------------:|
-| *(Screenshot)*       | *(Recording)*         |
+| *(Screenshot)*       | *(Recording)*         |-->
 
 ## Contributing
 
