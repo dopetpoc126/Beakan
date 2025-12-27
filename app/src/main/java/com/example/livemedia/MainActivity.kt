@@ -15,9 +15,6 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.ui.graphics.Color
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -30,13 +27,24 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.math.sin
 
 class MainActivity : ComponentActivity() {
     
@@ -56,31 +64,15 @@ class MainActivity : ComponentActivity() {
         
         setContent {
             LiveMediaTheme {
-                AppNavigation()
+                MainScreen()
             }
-        }
-    }
-}
-
-enum class AppScreen {
-    Main, Info
-}
-
-@Composable
-fun AppNavigation() {
-    var currentScreen by remember { mutableStateOf(AppScreen.Main) }
-    
-    Crossfade(targetState = currentScreen, label = "screen_nav") { screen ->
-        when (screen) {
-            AppScreen.Main -> MainScreen(onNavigateToInfo = { currentScreen = AppScreen.Info })
-            AppScreen.Info -> InfoScreen(onBack = { currentScreen = AppScreen.Main })
         }
     }
 }
 
 @Composable
 fun LiveMediaTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = androidx.compose.foundation.isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
     val dynamicColor = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
@@ -100,8 +92,7 @@ fun LiveMediaTheme(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-
-fun MainScreen(onNavigateToInfo: () -> Unit) {
+fun MainScreen() {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
     
@@ -124,66 +115,361 @@ fun MainScreen(onNavigateToInfo: () -> Unit) {
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize()) {
-            AnimatedMusicBackground()
+            // Themed Animated Background
+            ThemedAnimatedBackground()
             
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
                     .verticalScroll(scrollState)
-                    .padding(24.dp),
+                    .padding(horizontal = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Spacer(modifier = Modifier.height(48.dp))
+                Spacer(modifier = Modifier.height(60.dp))
                 
-                // Hero icon
-                AnimatedBeakanIcon()
-            
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            // Title
-            Text(
-                "Beakan",
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Medium
-            )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            // Subtitle
-            Text(
-                "See what's playing in your status bar",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-            
-            Spacer(modifier = Modifier.height(48.dp))
-            
-            // Status card
-            StatusCard(isActive = hasListenerPermission)
-            
-            Spacer(modifier = Modifier.height(32.dp))
-            
-            // Features
-            FeatureList()
-            
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            OutlinedButton(
-                onClick = onNavigateToInfo,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(Icons.Outlined.Info, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("How it works")
+                // Hero Section
+                HeroMorphingIcon()
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                Text(
+                    "Beakan",
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Text(
+                    "OTPs • Downloads • Media",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Medium
+                )
+                
+                Text(
+                    "All in your status bar",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                Spacer(modifier = Modifier.height(40.dp))
+                
+                // Status Card
+                StatusCard(isActive = hasListenerPermission)
+                
+                Spacer(modifier = Modifier.height(40.dp))
+                
+                // Feature Showcase
+                Text(
+                    "How it works",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.align(Alignment.Start)
+                )
+                
+                Spacer(modifier = Modifier.height(20.dp))
+                
+                // OTP Showcase
+                OtpShowcaseCard()
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Download Showcase
+                DownloadShowcaseCard()
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Media Showcase
+                MediaShowcaseCard()
+                
+                Spacer(modifier = Modifier.height(40.dp))
             }
-            
-            Spacer(modifier = Modifier.height(32.dp))
         }
     }
+}
+
+// ============== THEMED ANIMATED BACKGROUND ==============
+
+@Composable
+fun ThemedAnimatedBackground() {
+    val infiniteTransition = rememberInfiniteTransition(label = "bg")
+    
+    val time by infiniteTransition.animateFloat(
+        initialValue = 0f, targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(30000, easing = LinearEasing)), label = "time"
+    )
+    
+    val pulse by infiniteTransition.animateFloat(
+        initialValue = 0.8f, targetValue = 1.2f,
+        animationSpec = infiniteRepeatable(tween(3000), RepeatMode.Reverse), label = "pulse"
+    )
+    
+    val colorPrimary = MaterialTheme.colorScheme.primaryContainer
+    val colorSecondary = MaterialTheme.colorScheme.secondaryContainer
+    val colorTertiary = MaterialTheme.colorScheme.tertiaryContainer
+    
+    Canvas(modifier = Modifier.fillMaxSize().alpha(0.4f)) {
+        val w = size.width
+        val h = size.height
+        
+        // Large gradient orbs
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(colorPrimary, colorPrimary.copy(alpha = 0f)),
+                center = Offset(w * 0.2f, h * 0.1f),
+                radius = w * 0.6f
+            ),
+            center = Offset(w * 0.2f + sin(Math.toRadians(time.toDouble())).toFloat() * 50, h * 0.1f),
+            radius = w * 0.5f * pulse
+        )
+        
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(colorSecondary, colorSecondary.copy(alpha = 0f)),
+                center = Offset(w * 0.8f, h * 0.4f)
+            ),
+            center = Offset(w * 0.8f, h * 0.4f + sin(Math.toRadians((time + 120).toDouble())).toFloat() * 40),
+            radius = w * 0.45f
+        )
+        
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(colorTertiary, colorTertiary.copy(alpha = 0f))
+            ),
+            center = Offset(w * 0.5f + sin(Math.toRadians((time + 60).toDouble())).toFloat() * 30, h * 0.85f),
+            radius = w * 0.4f * pulse
+        )
+        
+        // Floating themed shapes
+        val shapeOffset = time / 10f
+        
+        // Lock shape (OTP)
+        drawLockShape(
+            center = Offset(w * 0.15f, h * 0.3f + sin(Math.toRadians((time * 2).toDouble())).toFloat() * 20),
+            size = 40f,
+            color = colorPrimary.copy(alpha = 0.6f),
+            rotation = shapeOffset
+        )
+        
+        // Download arrow (Downloads)
+        drawDownloadArrow(
+            center = Offset(w * 0.85f, h * 0.6f + sin(Math.toRadians((time * 1.5).toDouble())).toFloat() * 25),
+            size = 35f,
+            color = colorSecondary.copy(alpha = 0.6f),
+            rotation = -shapeOffset / 2
+        )
+        
+        // Music note (Media)
+        drawMusicNote(
+            center = Offset(w * 0.25f + sin(Math.toRadians(time.toDouble())).toFloat() * 15, h * 0.7f),
+            size = 30f,
+            color = colorTertiary.copy(alpha = 0.6f),
+            rotation = shapeOffset * 0.5f
+        )
+        
+        // Additional smaller shapes
+        drawLockShape(
+            center = Offset(w * 0.75f, h * 0.15f + sin(Math.toRadians((time * 3).toDouble())).toFloat() * 15),
+            size = 25f,
+            color = colorPrimary.copy(alpha = 0.4f),
+            rotation = -shapeOffset * 2
+        )
+        
+        drawDownloadArrow(
+            center = Offset(w * 0.4f, h * 0.5f + sin(Math.toRadians((time * 2.5).toDouble())).toFloat() * 20),
+            size = 20f,
+            color = colorSecondary.copy(alpha = 0.4f),
+            rotation = shapeOffset
+        )
     }
 }
+
+// Shape drawing helpers
+private fun DrawScope.drawLockShape(center: Offset, size: Float, color: Color, rotation: Float) {
+    rotate(rotation, pivot = center) {
+        // Lock body
+        drawRoundRect(
+            color = color,
+            topLeft = Offset(center.x - size/2, center.y - size/4),
+            size = androidx.compose.ui.geometry.Size(size, size * 0.75f),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(size * 0.15f)
+        )
+        // Lock shackle
+        drawArc(
+            color = color,
+            startAngle = 180f,
+            sweepAngle = 180f,
+            useCenter = false,
+            topLeft = Offset(center.x - size * 0.35f, center.y - size * 0.7f),
+            size = androidx.compose.ui.geometry.Size(size * 0.7f, size * 0.5f),
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = size * 0.12f)
+        )
+    }
+}
+
+private fun DrawScope.drawDownloadArrow(center: Offset, size: Float, color: Color, rotation: Float) {
+    rotate(rotation, pivot = center) {
+        val path = Path().apply {
+            // Arrow body
+            moveTo(center.x, center.y - size * 0.6f)
+            lineTo(center.x, center.y + size * 0.2f)
+            // Arrow head
+            moveTo(center.x - size * 0.4f, center.y - size * 0.1f)
+            lineTo(center.x, center.y + size * 0.4f)
+            lineTo(center.x + size * 0.4f, center.y - size * 0.1f)
+        }
+        drawPath(path, color, style = androidx.compose.ui.graphics.drawscope.Stroke(width = size * 0.15f, cap = StrokeCap.Round))
+        
+        // Base line
+        drawLine(color, Offset(center.x - size * 0.4f, center.y + size * 0.5f), 
+                 Offset(center.x + size * 0.4f, center.y + size * 0.5f), strokeWidth = size * 0.12f)
+    }
+}
+
+private fun DrawScope.drawMusicNote(center: Offset, size: Float, color: Color, rotation: Float) {
+    rotate(rotation, pivot = center) {
+        // Note head
+        drawOval(
+            color = color,
+            topLeft = Offset(center.x - size * 0.3f, center.y + size * 0.2f),
+            size = androidx.compose.ui.geometry.Size(size * 0.5f, size * 0.35f)
+        )
+        // Stem
+        drawLine(color, Offset(center.x + size * 0.15f, center.y + size * 0.35f),
+                 Offset(center.x + size * 0.15f, center.y - size * 0.5f), strokeWidth = size * 0.1f)
+        // Flag
+        drawArc(
+            color = color,
+            startAngle = -90f,
+            sweepAngle = 90f,
+            useCenter = false,
+            topLeft = Offset(center.x + size * 0.1f, center.y - size * 0.5f),
+            size = androidx.compose.ui.geometry.Size(size * 0.35f, size * 0.4f),
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = size * 0.08f)
+        )
+    }
+}
+
+// ============== HERO MORPHING ICON ==============
+
+@Composable
+fun HeroMorphingIcon() {
+    val infiniteTransition = rememberInfiniteTransition(label = "hero_morph")
+    
+    // Cycle 0 -> 1 -> 2 -> 0 (Wave -> Lock -> Download)
+    val phase by infiniteTransition.animateFloat(
+        initialValue = 0f, targetValue = 3f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(6000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ), label = "phase"
+    )
+    
+    // Determine current indices and fraction
+    val currentIndex = phase.toInt() % 3
+    val nextIndex = (currentIndex + 1) % 3
+    val fraction = phase - phase.toInt()
+    
+    // Easing for snap effect
+    val easedFraction = remember(fraction) {
+        val t = fraction
+        if (t < 0.5) 4 * t * t * t else 1 - (-2 * t + 2) * (-2 * t + 2) * (-2 * t + 2) / 2
+    }
+    
+    // Status Bar Chip Pill Container - BIGGER
+    Surface(
+        modifier = Modifier
+            .width(96.dp)
+            .height(48.dp),
+        shape = RoundedCornerShape(50), // Pill / Stadium
+        color = Color(0xFF121212), // Black "Status Bar" color
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Canvas(
+                modifier = Modifier
+                    .size(32.dp) // Bigger icon
+            ) {
+                val size = size.minDimension
+                val scale = size / 100f
+                
+                // --- SHAPE DEFINITIONS (4 Segments Total: A1, A2, B1, B2) ---
+                // Format: P0x, P0y, C0x, C0y, C1x, C1y, P1x, P1y
+                
+                // === WAVE (Sine) ===
+                // A1: Up Slope (10,50 -> 30,20)
+                // A2: Down Slope (30,20 -> 50,50)
+                // B1: Down Slope (50,50 -> 70,80)
+                // B2: Up Slope (70,80 -> 90,50)
+                val wave = listOf(
+                    // Path A (Left Hump)
+                    10f,50f, 20f,20f, 25f,20f, 30f,20f, // A1
+                    30f,20f, 35f,20f, 40f,50f, 50f,50f, // A2
+                    // Path B (Right Hump)
+                    50f,50f, 60f,80f, 65f,80f, 70f,80f, // B1
+                    70f,80f, 75f,80f, 80f,50f, 90f,50f  // B2
+                )
+                
+                // === SHIELD (OTP Symbol) ===
+                // A1: Top Left -> Top Center (20,20 -> 50,15)
+                // A2: Top Center -> Top Right (50,15 -> 80,20)
+                // B1: Right Side -> Bottom Tip (80,20 -> 50,90) - Curve it
+                // B2: Bottom Tip -> Left Side (50,90 -> 20,20) - Curve it
+                val shield = listOf(
+                    // Path A (Top Rim)
+                    20f,20f, 20f,20f, 35f,15f, 50f,15f, // A1
+                    50f,15f, 65f,15f, 80f,20f, 80f,20f, // A2
+                    // Path B (Body)
+                    80f,20f, 80f,60f, 60f,85f, 50f,90f, // B1
+                    50f,90f, 40f,85f, 20f,60f, 20f,20f  // B2
+                )
+                
+                // === DOWNLOAD ===
+                // A1: Top Shaft (50,15 -> 50,50)
+                // A2: Bottom Shaft (50,50 -> 50,85)
+                // B1: Left Wing (30,55 -> 50,85)
+                // B2: Right Wing (50,85 -> 70,55)
+                val dl = listOf(
+                    // Path A (Shaft)
+                    50f,15f, 50f,15f, 50f,50f, 50f,50f, // A1
+                    50f,50f, 50f,50f, 50f,85f, 50f,85f, // A2
+                    // Path B (Arrowhead)
+                    30f,55f, 30f,55f, 40f,70f, 50f,85f, // B1
+                    50f,85f, 60f,70f, 70f,55f, 70f,55f  // B2
+                )
+                
+                val allShapes = listOf(wave, shield, dl)
+                
+                // LERP
+                val start = allShapes[currentIndex]
+                val end = allShapes[nextIndex]
+                
+                fun v(i: Int) = start[i] + (end[i] - start[i]) * easedFraction
+                fun s(x: Float) = x * scale
+                
+                // DRAW
+                // Path A
+                val pathA = Path()
+                pathA.moveTo(s(v(0)), s(v(1))) // P0
+                pathA.cubicTo(s(v(2)), s(v(3)), s(v(4)), s(v(5)), s(v(6)), s(v(7))) // A1
+                pathA.cubicTo(s(v(10)), s(v(11)), s(v(12)), s(v(13)), s(v(14)), s(v(15))) // A2
+                drawPath(pathA, Color.White, style = Stroke(width = s(8f), cap = StrokeCap.Round, join = StrokeJoin.Round))
+                
+                // Path B
+                val pathB = Path()
+                pathB.moveTo(s(v(16)), s(v(17))) // P0
+                pathB.cubicTo(s(v(18)), s(v(19)), s(v(20)), s(v(21)), s(v(22)), s(v(23))) // B1
+                pathB.cubicTo(s(v(26)), s(v(27)), s(v(28)), s(v(29)), s(v(30)), s(v(31))) // B2
+                drawPath(pathB, Color.White, style = Stroke(width = s(8f), cap = StrokeCap.Round, join = StrokeJoin.Round))
+            }
+        }
+    }
+}
+
+// ============== STATUS CARD ==============
 
 @Composable
 fun StatusCard(isActive: Boolean) {
@@ -197,29 +483,21 @@ fun StatusCard(isActive: Boolean) {
             else 
                 MaterialTheme.colorScheme.errorContainer
         ),
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(20.dp)
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(
-                    modifier = Modifier.size(40.dp),
+                    modifier = Modifier.size(48.dp),
                     shape = CircleShape,
-                    color = if (isActive) 
-                        MaterialTheme.colorScheme.primary 
-                    else 
-                        MaterialTheme.colorScheme.error
+                    color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             if (isActive) Icons.Default.Check else Icons.Default.Close,
                             contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                            tint = if (isActive) 
-                                MaterialTheme.colorScheme.onPrimary 
-                            else 
-                                MaterialTheme.colorScheme.onError
+                            modifier = Modifier.size(24.dp),
+                            tint = if (isActive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onError
                         )
                     }
                 }
@@ -228,21 +506,14 @@ fun StatusCard(isActive: Boolean) {
                 
                 Column {
                     Text(
-                        if (isActive) "Active" else "Setup required",
+                        if (isActive) "Active" else "Setup Required",
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Medium,
-                        color = if (isActive) 
-                            MaterialTheme.colorScheme.onPrimaryContainer 
-                        else 
-                            MaterialTheme.colorScheme.onErrorContainer
+                        fontWeight = FontWeight.SemiBold
                     )
                     Text(
                         if (isActive) "Live updates enabled" else "Enable notification access",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = if (isActive) 
-                            MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                        else 
-                            MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -250,499 +521,357 @@ fun StatusCard(isActive: Boolean) {
             if (!isActive) {
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                FilledTonalButton(
-                    onClick = {
-                        context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-                    },
+                Button(
+                    onClick = { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) },
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = MaterialTheme.colorScheme.error,
-                        contentColor = MaterialTheme.colorScheme.onError
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
                     )
                 ) {
-                    Text("Enable")
+                    Icon(Icons.Default.Settings, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Enable Access")
                 }
             }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun InfoScreen(onBack: () -> Unit) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("How it works") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = MaterialTheme.colorScheme.surface
-                )
-            )
-        },
-        containerColor = MaterialTheme.colorScheme.background
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // 1. Status Bar Chip Animation
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("How it works", style = MaterialTheme.typography.titleLarge)
-            Spacer(modifier = Modifier.height(32.dp))
+// ============== OTP SHOWCASE CARD ==============
 
-            Text("1. Shows song info in status bar", style = MaterialTheme.typography.titleMedium)
-            Spacer(modifier = Modifier.height(16.dp))
+@Composable
+fun OtpShowcaseCard() {
+    // Simple state loop for "bare minimum" complexity
+    var isExpanded by remember { mutableStateOf(false) }
+    
+    // Sequential animation loop: 4s ON, 8s OFF
+    LaunchedEffect(Unit) {
+        while (true) {
+            isExpanded = true
+            delay(4000) // Show for 4s
+            isExpanded = false
+            delay(8000) // Wait 8s for other cards
+        }
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        shape = RoundedCornerShape(24.dp)
+    ) {
+        Column(modifier = Modifier.padding(24.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Outlined.Lock, null, Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(12.dp))
+                Text("OTP Detection", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            }
             
-            StatusBarChipAnimation()
+            Spacer(Modifier.height(20.dp))
             
-            Spacer(modifier = Modifier.height(48.dp))
+            // Phone mockup
+            Surface(
+                modifier = Modifier.fillMaxWidth(), // Height auto-adjusts or fix it
+                color = Color(0xFF121212),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Box(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.Top) {
+                        Text(
+                            "12:00",
+                            color = Color.White.copy(alpha = 0.9f),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(top = 8.dp) // Align visually with chip
+                        )
+                        
+                        Spacer(Modifier.width(16.dp))
+                        
+                        // THE "BARE MINIMUM" MAGIC: animateContentSize
+                        Surface(
+                            modifier = Modifier.animateContentSize(animationSpec = spring(stiffness = Spring.StiffnessLow)),
+                            shape = RoundedCornerShape(if (isExpanded) 16.dp else 50.dp), // Morph shape too
+                            color = MaterialTheme.colorScheme.primaryContainer
+                        ) {
+                            // Content switches simply based on state
+                            // No pixel math. Just "Show this" or "Show that".
+                            if (isExpanded) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Lock, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                                        Spacer(Modifier.width(8.dp))
+                                        Column {
+                                            Text("SECURITY CODE", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(0.7f))
+                                            Text("433 502", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                                        }
+                                    }
+                                    
+                                    // Simulated Button
+                                    Surface(
+                                        color = MaterialTheme.colorScheme.primary,
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Text(
+                                            "COPY CODE", 
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.onPrimary
+                                        )
+                                    }
+                                }
+                            } else {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.Lock, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("433502", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             
-            // 2. Expanded Controls Animation
-            Text("2. Expand for controls", style = MaterialTheme.typography.titleMedium)
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            ExpandedControlsAnimation()
-            
-            Spacer(modifier = Modifier.height(48.dp))
+            Spacer(Modifier.height(16.dp))
+            Text("Automatically detects and offers to copy OTPs.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
 
+// ============== DOWNLOAD SHOWCASE CARD ==============
+
 @Composable
-fun FeatureList() {
-    val features = listOf(
-        FeatureItem(
-            Icons.Outlined.Notifications,
-            "Status bar updates",
-            "Song title shown as a live chip"
-        ),
-        FeatureItem(
-            Icons.Outlined.Refresh,
-            "Auto detection",
-            "Switches between media apps automatically"
-        ),
-        FeatureItem(
-            Icons.Outlined.PlayArrow,
-            "Real-time sync",
-            "Progress bar updates every second"
-        )
+fun DownloadShowcaseCard() {
+    var isExpanded by remember { mutableStateOf(false) }
+    
+    val infiniteTransition = rememberInfiniteTransition(label = "download_progress")
+    val progress by infiniteTransition.animateFloat(
+        initialValue = 0f, targetValue = 100f,
+        animationSpec = infiniteRepeatable(tween(5000, easing = LinearEasing), RepeatMode.Restart), label = "progress"
     )
     
-    Column(
+    LaunchedEffect(Unit) {
+        delay(4000)
+        while (true) {
+            isExpanded = true
+            delay(4000)
+            isExpanded = false
+            delay(8000)
+        }
+    }
+
+    Card(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        shape = RoundedCornerShape(24.dp)
     ) {
-        features.forEach { feature ->
-            ListItem(
-                headlineContent = {
-                    Text(
-                        feature.title,
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                },
-                supportingContent = {
-                    Text(
-                        feature.description,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                },
-                leadingContent = {
-                    Icon(
-                        feature.icon,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                },
-                colors = ListItemDefaults.colors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            )
+        Column(modifier = Modifier.padding(24.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Outlined.Refresh, null, Modifier.size(24.dp), tint = MaterialTheme.colorScheme.secondary)
+                Spacer(Modifier.width(12.dp))
+                Text("Download Progress", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            }
+            
+            Spacer(Modifier.height(20.dp))
+            
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = Color(0xFF121212),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Box(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.Top) {
+                        Text(
+                            "12:00",
+                            color = Color.White.copy(alpha = 0.9f),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                        
+                        Spacer(Modifier.width(16.dp))
+                        
+                        Surface(
+                            modifier = Modifier.animateContentSize(animationSpec = spring(stiffness = Spring.StiffnessLow)),
+                            shape = RoundedCornerShape(if (isExpanded) 16.dp else 50.dp),
+                            color = MaterialTheme.colorScheme.secondaryContainer
+                        ) {
+                            if (isExpanded) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Refresh, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                                        Spacer(Modifier.width(8.dp))
+                                        Column {
+                                            Text("DOWNLOADING...", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSecondaryContainer.copy(0.7f))
+                                            Text("${progress.toInt()}%", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                                        }
+                                    }
+                                    
+                                    LinearProgressIndicator(
+                                        progress = { progress / 100f },
+                                        modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
+                                        color = MaterialTheme.colorScheme.secondary,
+                                        trackColor = MaterialTheme.colorScheme.onSecondaryContainer.copy(0.1f)
+                                    )
+                                    
+                                    Surface(
+                                        color = MaterialTheme.colorScheme.surface,
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Text(
+                                            "CANCEL", 
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                }
+                            } else {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.Refresh, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("${progress.toInt()}%", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            Spacer(Modifier.height(16.dp))
+            Text("Shows download progress. Cancel with a tap.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
 
-data class FeatureItem(
-    val icon: ImageVector,
-    val title: String,
-    val description: String
-)
+// ============== MEDIA SHOWCASE CARD ==============
+
+@Composable
+fun MediaShowcaseCard() {
+    var isExpanded by remember { mutableStateOf(false) }
+    
+    val infiniteTransition = rememberInfiniteTransition(label = "media_play")
+    val playProgress by infiniteTransition.animateFloat(
+        initialValue = 0f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(4000, easing = LinearEasing), RepeatMode.Restart), label = "play"
+    )
+    
+    LaunchedEffect(Unit) {
+        delay(8000)
+        while (true) {
+            isExpanded = true
+            delay(4000)
+            isExpanded = false
+            delay(8000)
+        }
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        shape = RoundedCornerShape(24.dp)
+    ) {
+        Column(modifier = Modifier.padding(24.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Outlined.PlayArrow, null, Modifier.size(24.dp), tint = MaterialTheme.colorScheme.tertiary)
+                Spacer(Modifier.width(12.dp))
+                Text("Media Controls", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            }
+            
+            Spacer(Modifier.height(20.dp))
+            
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = Color(0xFF121212),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Box(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.Top) {
+                        Text(
+                            "12:00",
+                            color = Color.White.copy(alpha = 0.9f),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                        
+                        Spacer(Modifier.width(16.dp))
+                        
+                        Surface(
+                            modifier = Modifier.animateContentSize(animationSpec = spring(stiffness = Spring.StiffnessLow)),
+                            shape = RoundedCornerShape(if (isExpanded) 16.dp else 50.dp),
+                            color = MaterialTheme.colorScheme.tertiaryContainer
+                        ) {
+                            if (isExpanded) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Surface(
+                                            modifier = Modifier.size(40.dp),
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f)
+                                        ) {
+                                            Icon(Icons.Default.PlayArrow, null, Modifier.padding(8.dp), tint = MaterialTheme.colorScheme.onTertiaryContainer)
+                                        }
+                                        Spacer(Modifier.width(12.dp))
+                                        Column {
+                                            Text("Song Title", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onTertiaryContainer)
+                                            Text("Artist Name", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onTertiaryContainer.copy(0.7f))
+                                        }
+                                    }
+                                    
+                                    LinearProgressIndicator(
+                                        progress = { playProgress },
+                                        modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
+                                        color = MaterialTheme.colorScheme.tertiary,
+                                        trackColor = MaterialTheme.colorScheme.onTertiaryContainer.copy(0.1f)
+                                    )
+                                    
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceEvenly
+                                    ) {
+                                        Icon(Icons.Default.ArrowBack, null, Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onTertiaryContainer.copy(0.7f))
+                                        Icon(Icons.Default.PlayArrow, null, Modifier.size(32.dp), tint = MaterialTheme.colorScheme.onTertiaryContainer)
+                                        Icon(Icons.Default.ArrowForward, null, Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onTertiaryContainer.copy(0.7f))
+                                    }
+                                }
+                            } else {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.PlayArrow, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onTertiaryContainer)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Playing...", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onTertiaryContainer)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            Spacer(Modifier.height(16.dp))
+            Text("Control music from anywhere. Fluid animations.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+// ============== UTILS ==============
 
 private fun isNotificationServiceEnabled(context: Context): Boolean {
     val flat = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
     return flat?.contains(context.packageName) == true
-}
-
-@Composable
-fun AnimatedBeakanIcon() {
-    val infiniteTransition = rememberInfiniteTransition(label = "wave")
-    val duration = 700
-    
-    // Create 5 animated values for bar heights with different phases
-    // We use a combination of different durations and start offsets to create a seemingly random "voice" wave
-    val heights = listOf(
-        infiniteTransition.animateFloat(0.3f, 0.7f, infiniteRepeatable(tween(duration, easing = LinearEasing), RepeatMode.Reverse, StartOffset(0)), "1"),
-        infiniteTransition.animateFloat(0.4f, 0.9f, infiniteRepeatable(tween(duration + 150, easing = LinearEasing), RepeatMode.Reverse, StartOffset(200)), "2"),
-        infiniteTransition.animateFloat(0.5f, 1.0f, infiniteRepeatable(tween(duration - 100, easing = LinearEasing), RepeatMode.Reverse, StartOffset(400)), "3"),
-        infiniteTransition.animateFloat(0.4f, 0.9f, infiniteRepeatable(tween(duration + 200, easing = LinearEasing), RepeatMode.Reverse, StartOffset(100)), "4"),
-        infiniteTransition.animateFloat(0.3f, 0.7f, infiniteRepeatable(tween(duration + 50, easing = LinearEasing), RepeatMode.Reverse, StartOffset(300)), "5")
-    )
-
-    Surface(
-        modifier = Modifier.size(width = 120.dp, height = 72.dp),
-        shape = RoundedCornerShape(100.dp), // Pill shape
-        color = MaterialTheme.colorScheme.primaryContainer,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.1f))
-    ) {
-        Row(
-            modifier = Modifier.fillMaxSize(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            heights.forEach { height ->
-                Box(
-                    modifier = Modifier
-                        .padding(horizontal = 3.dp)
-                        .width(6.dp)
-                        .fillMaxHeight(height.value * 0.6f)
-                        .clip(RoundedCornerShape(50))
-                        .background(MaterialTheme.colorScheme.onPrimaryContainer)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun AnimatedMusicBackground() {
-    val infiniteTransition = rememberInfiniteTransition(label = "background_anim")
-    
-    // Faster, livelier animations
-    val orb1Anim by infiniteTransition.animateFloat(
-        initialValue = 0f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(12000, easing = LinearEasing), RepeatMode.Reverse), label = "orb1"
-    )
-    
-    val orb2Anim by infiniteTransition.animateFloat(
-        initialValue = 0f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(15000, easing = LinearEasing), RepeatMode.Reverse), label = "orb2"
-    )
-    
-    val orb3Anim by infiniteTransition.animateFloat(
-        initialValue = 0.3f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(10000, easing = LinearEasing), RepeatMode.Reverse), label = "orb3"
-    )
-    
-    val particleAnim by infiniteTransition.animateFloat(
-        initialValue = 0f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(8000, easing = LinearEasing), RepeatMode.Reverse), label = "particle"
-    )
-    
-    val colorPrimary = MaterialTheme.colorScheme.primaryContainer
-    val colorSecondary = MaterialTheme.colorScheme.secondaryContainer
-    val colorTertiary = MaterialTheme.colorScheme.tertiaryContainer
-    val colorError = MaterialTheme.colorScheme.errorContainer
-    
-    // Subtle background
-    Canvas(modifier = Modifier.fillMaxSize().alpha(0.35f)) {
-        val width = size.width
-        val height = size.height
-        
-        // Large Sphere 1 (Top Left)
-        drawCircle(
-            color = colorPrimary.copy(alpha = 0.5f),
-            radius = size.width * 0.55f,
-            center = androidx.compose.ui.geometry.Offset(
-                x = width * 0.2f + (width * 0.3f * orb1Anim),
-                y = height * 0.1f + (height * 0.2f * orb2Anim)
-            )
-        )
-        
-        // Large Sphere 2 (Bottom Right)
-        drawCircle(
-            color = colorSecondary.copy(alpha = 0.5f),
-            radius = size.width * 0.5f,
-            center = androidx.compose.ui.geometry.Offset(
-                x = width * 0.8f - (width * 0.3f * orb2Anim),
-                y = height * 0.8f - (height * 0.2f * orb1Anim)
-            )
-        )
-        
-        // Pulse Sphere (Center-ish)
-        drawCircle(
-            color = colorTertiary.copy(alpha = 0.4f),
-            radius = size.width * 0.3f + (size.width * 0.2f * orb3Anim),
-            center = androidx.compose.ui.geometry.Offset(
-                x = width * 0.5f + (width * 0.1f * orb1Anim), 
-                y = height * 0.4f + (height * 0.2f * orb3Anim)
-            )
-        )
-        
-        // Small "Note" Orb (Top Right)
-        drawCircle(
-            color = colorError.copy(alpha = 0.3f),
-            radius = size.width * 0.15f,
-            center = androidx.compose.ui.geometry.Offset(
-                x = width * 0.8f - (width * 0.1f * particleAnim),
-                y = height * 0.2f + (height * 0.1f * orb3Anim)
-            )
-        )
-        
-        // Floating Particles (representing beats/debris)
-        val particleRadius = size.width * 0.02f
-        drawCircle(
-            color = colorPrimary,
-            radius = particleRadius,
-            center = androidx.compose.ui.geometry.Offset(
-                x = width * 0.1f + (width * 0.8f * particleAnim),
-                y = height * 0.6f + (height * 0.1f * orb2Anim)
-            )
-        )
-        drawCircle(
-            color = colorSecondary,
-            radius = particleRadius * 1.5f,
-            center = androidx.compose.ui.geometry.Offset(
-                x = width * 0.9f - (width * 0.6f * particleAnim),
-                y = height * 0.3f + (height * 0.4f * orb1Anim)
-            )
-        )
-    }
-}
-
-@Composable
-fun StatusBarChipAnimation() {
-    val infiniteTransition = rememberInfiniteTransition(label = "chip_anim")
-    
-    // Animate chip expansion
-    val widthFraction by infiniteTransition.animateFloat(
-        initialValue = 0f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = keyframes {
-                durationMillis = 4000
-                0f at 0 // Start hidden
-                0f at 500 // Wait
-                0.2f at 800 with FastOutSlowInEasing // Icon appears
-                1f at 1500 with LinearOutSlowInEasing // Chip expands
-                1f at 3500 // Stay visible
-                0f at 4000 // Reset
-            },
-            repeatMode = RepeatMode.Restart
-        ), label = "width"
-    )
-    
-    // Simulate Status Bar
-    Surface(
-        modifier = Modifier
-            .width(300.dp)
-            .height(50.dp),
-        color = Color.Black,
-        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
-    ) {
-        Box(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-            contentAlignment = Alignment.TopStart
-        ) {
-            // Simulated Clock
-            Text(
-                "12:00",
-                color = Color.White,
-                style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.padding(top = 14.dp)
-            )
-            
-            // The Chip
-            Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.TopStart // Status bar chip typically appears next to clock or center
-            ) {
-                 Row(
-                    modifier = Modifier
-                        .padding(start = 40.dp, top = 8.dp) // Offset from clock
-                        .height(28.dp)
-                        .fillMaxWidth(widthFraction * 0.6f) // Max width constraint
-                        .clip(RoundedCornerShape(50))
-                        .background(MaterialTheme.colorScheme.primaryContainer),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (widthFraction > 0.1f) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Icon(
-                        Icons.Default.PlayArrow, 
-                            contentDescription = null, 
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(14.dp)
-                        )
-                    }
-                    
-                    if (widthFraction > 0.3f) {
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            "Song Title...",
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            style = MaterialTheme.typography.labelSmall,
-                            maxLines = 1
-                        )
-                    }
-                }
-            }
-        }
-    }
-    
-    Spacer(modifier = Modifier.height(20.dp))
-    
-    // Phone Frame Bottom (Aesthetic only)
-    Surface(
-        modifier = Modifier
-            .width(300.dp)
-            .height(20.dp),
-        color = Color.LightGray.copy(alpha = 0.2f),
-        shape = RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp)
-    ) {}
-}
-
-@Composable
-fun ExpandedControlsAnimation() {
-    val infiniteTransition = rememberInfiniteTransition(label = "expanded_anim")
-    
-    // Animate expansion progress
-    val expandProgress by infiniteTransition.animateFloat(
-        initialValue = 0f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = keyframes {
-                durationMillis = 6000
-                0f at 0 // Start collapsed (chip)
-                0f at 1000 // Wait
-                1f at 1800 with LinearOutSlowInEasing // Expand to card
-                1f at 4500 // Hold expanded
-                0f at 5000 with FastOutSlowInEasing // Collapse
-                0f at 6000 // Reset
-            },
-            repeatMode = RepeatMode.Restart
-        ), label = "expand"
-    )
-
-    // Simulate Status Bar / Notification Shade area
-    Surface(
-        modifier = Modifier
-            .width(300.dp)
-            .height(220.dp),
-        color = Color.Black,
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Box(
-             modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-             contentAlignment = Alignment.TopStart
-        ) {
-            // Simulated Clock (Context)
-            Text(
-                "12:00",
-                color = Color.White,
-                style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.padding(top = 14.dp)
-            )
-
-            // The Expanding Card
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp), // Align top with status bar
-                contentAlignment = Alignment.TopStart // Align left (next to clock)
-            ) {
-                // Height morphs: 30dp -> 170dp (enough for all content)
-                val currentHeight = 30.dp + (140.dp * expandProgress)
-                
-                // Width morphs: 100dp -> 225dp (Fits in remaining space: 300 - 32(margin) - 46(offset) = ~222 left)
-                // We offset by 46dp to clear the "12:00" clock
-                val currentWidth = 100.dp + (125.dp * expandProgress) 
-                
-                val cornerRadius = 50.dp - (34.dp * expandProgress) // 50dp -> 16dp
-                
-                Surface(
-                    modifier = Modifier
-                        .padding(start = 46.dp) // Offset to sit right of the clock
-                        .width(currentWidth)
-                        .height(currentHeight),
-                    shape = RoundedCornerShape(cornerRadius),
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    tonalElevation = 4.dp
-                ) {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                         // 1. Collapsed State Content (Chip)
-                         Row(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 8.dp) // Inner padding
-                                .alpha((1f - expandProgress * 3f).coerceIn(0f, 1f)),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Start // Left align text in chip
-                        ) {
-                            Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Song Title", style = MaterialTheme.typography.labelSmall, maxLines = 1)
-                        }
-                        
-                        // 2. Expanded State Content (Media Controls)
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(16.dp)
-                                .alpha(((expandProgress - 0.3f) * 2f).coerceIn(0f, 1f)),
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                // Album Art Placeholder
-                                Surface(
-                                    modifier = Modifier.size(48.dp),
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = MaterialTheme.colorScheme.primary.copy(alpha=0.3f)
-                                ) {
-                                    Icon(Icons.Default.PlayArrow, null, modifier = Modifier.padding(12.dp))
-                                }
-                                
-                                Spacer(modifier = Modifier.width(12.dp))
-                                
-                                Column {
-                                    Text("Song Title", style = MaterialTheme.typography.titleMedium, maxLines=1)
-                                    Text("Artist Name", style = MaterialTheme.typography.bodySmall, maxLines=1)
-                                }
-                            }
-                            
-                            // Precise centering: 31dp above and below progress bar
-                            Spacer(modifier = Modifier.height(31.dp))
-                            
-                            // Progress Bar (4dp height)
-                            LinearProgressIndicator(
-                                progress = { 0.6f },
-                                modifier = Modifier.fillMaxWidth().height(4.dp),
-                                color = MaterialTheme.colorScheme.primary,
-                                trackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha=0.2f)
-                            )
-                            
-                            Spacer(modifier = Modifier.height(31.dp))
-                            
-                            // Controls (24dp height)
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceEvenly
-                            ) {
-                                 Icon(Icons.Default.ArrowBack, null, modifier = Modifier.size(24.dp))
-                                 Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(24.dp))
-                                 Icon(Icons.Default.ArrowForward, null, modifier = Modifier.size(24.dp))
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
 }

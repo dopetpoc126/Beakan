@@ -51,16 +51,21 @@ class NotificationPublisher(private val context: Context) {
         sourcePackage: String,
         launchIntent: PendingIntent?,
         duration: Long = 0L,
-        position: Long = 0L
+        position: Long = 0L,
+        overrideChipText: String? = null,
+        skipMediaFilter: Boolean = false,
+        isNonMedia: Boolean = false
     ): Int {
-        val pendingIntent = launchIntent ?: createLaunchIntent(sourcePackage) // Fallback if null, but primary is passed
-        val chipText = createChipText(title)
-        val mediaActions = filterMediaActions(actions)
+        val pendingIntent = launchIntent ?: createLaunchIntent(sourcePackage)
+        val chipText = overrideChipText ?: createChipText(title)
+        
+        // For OTP/Download, we pass actions directly. For media, we filter.
+        val finalActions = if (skipMediaFilter) actions else filterMediaActions(actions)
         
         val notification = if (Build.VERSION.SDK_INT >= 36) {
-            buildAndroid16Notification(title, artist, bitmap, chipText, pendingIntent, mediaActions, duration, position)
+            buildAndroid16Notification(title, artist, bitmap, chipText, pendingIntent, finalActions, duration, position, isNonMedia)
         } else {
-            buildLegacyNotification(title, artist, bitmap, pendingIntent, mediaActions, duration, position)
+            buildLegacyNotification(title, artist, bitmap, pendingIntent, finalActions, duration, position, isNonMedia)
         }
 
         if (currentNotificationId != notificationId) {
@@ -114,13 +119,17 @@ class NotificationPublisher(private val context: Context) {
         title: String, artist: String, bitmap: Bitmap?,
         chipText: String, pendingIntent: PendingIntent?,
         actions: List<Notification.Action>,
-        duration: Long, position: Long
+        duration: Long, position: Long,
+        isNonMedia: Boolean
     ): Notification {
         val max = if (duration > 0) (duration / 1000).toInt() else 100
         val progress = if (duration > 0) (position / 1000).toInt() else 0
         
+        // Use neutral icon for OTP/Download, play icon for media
+        val iconRes = if (isNonMedia) android.R.drawable.ic_popup_sync else android.R.drawable.ic_media_play
+        
         return Notification.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setSmallIcon(iconRes)
             .setContentTitle(title)
             .setContentText(artist)
             .setLargeIcon(bitmap)
@@ -135,7 +144,12 @@ class NotificationPublisher(private val context: Context) {
                 extras.putBoolean("android.requestPromotedOngoing", true)
                 pendingIntent?.let { setContentIntent(it) }
                 actions.forEach { action ->
-                    val label = getActionLabel(action.title?.toString() ?: "")
+                    // For non-media (OTP/Download), preserve original label to show correct state (Pause/Resume)
+                    val label = if (isNonMedia) {
+                        action.title?.toString() ?: ""
+                    } else {
+                        getActionLabel(action.title?.toString() ?: "")
+                    }
                     addAction(Notification.Action.Builder(action.getIcon(), label, action.actionIntent).build())
                 }
             }
@@ -145,13 +159,16 @@ class NotificationPublisher(private val context: Context) {
     private fun buildLegacyNotification(
         title: String, artist: String, bitmap: Bitmap?,
         pendingIntent: PendingIntent?, actions: List<Notification.Action>,
-        duration: Long, position: Long
+        duration: Long, position: Long,
+        isNonMedia: Boolean
     ): Notification {
         val max = if (duration > 0) (duration / 1000).toInt() else 100
         val progress = if (duration > 0) (position / 1000).toInt() else 0
         
+        val iconRes = if (isNonMedia) android.R.drawable.ic_popup_sync else android.R.drawable.ic_media_play
+        
         return NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setSmallIcon(iconRes)
             .setContentTitle(title)
             .setContentText(artist)
             .setLargeIcon(bitmap)
@@ -166,7 +183,12 @@ class NotificationPublisher(private val context: Context) {
             .apply {
                 pendingIntent?.let { setContentIntent(it) }
                 actions.forEach { action ->
-                    val label = getActionLabel(action.title?.toString() ?: "")
+                    // For non-media (OTP/Download), preserve original label to show correct state (Pause/Resume)
+                    val label = if (isNonMedia) {
+                        action.title?.toString() ?: ""
+                    } else {
+                        getActionLabel(action.title?.toString() ?: "")
+                    }
                     addAction(NotificationCompat.Action.Builder(action.icon, label, action.actionIntent).build())
                 }
             }
