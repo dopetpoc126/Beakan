@@ -1,7 +1,7 @@
 # Beakan
 
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.0-purple.svg?style=flat&logo=kotlin)](https://kotlinlang.org)
-[![API](https://img.shields.io/badge/API-26%2B-brightgreen.svg?style=flat&logo=android)](https://android-arsenal.com/api?level=26)
+[![API](https://img.shields.io/badge/API-26%2B-brightgreen.svg?style=flat&logo=android)](https://android-arsenal.com/api?level=36)
 [![Service](https://img.shields.io/badge/Architecture-Service%20Layer-orange.svg?style=flat&logo=android)](https://developer.android.com/guide/components/services)
 
 **Beakan** brings iOS-style **Live Activities** to Android via the **Live Updates API** introduced in Android 16. It's a background service that catches specific notifications—like 2FA codes, downloads, and music—and promotes them into a unified, persistent status chip at the top of the screen.
@@ -82,7 +82,7 @@ We don't just scrape the notification title. Beakan looks for a `MediaSession` t
 | **Media** | `MediaSessionCompat` / `MediaController` |
 | **Parsing** | Standard Java Regex |
 | **State** | Kotlin Singletons |
-| **Min SDK** | Android 8.0 (API 26) |
+| **Min SDK** | Android 16.0 (API 36) |
 
 ## Setup
 
