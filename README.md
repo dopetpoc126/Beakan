@@ -4,7 +4,7 @@
 [![API](https://img.shields.io/badge/API-26%2B-brightgreen.svg?style=flat&logo=android)](https://android-arsenal.com/api?level=26)
 [![Service](https://img.shields.io/badge/Architecture-Service%20Layer-orange.svg?style=flat&logo=android)](https://developer.android.com/guide/components/services)
 
-**Beakan** brings iOS-style **Live Activities** to Android. It's a background service that catches specific notifications—like 2FA codes, downloads, and music—and promotes them into a unified, persistent status chip at the top of the screen.
+**Beakan** brings iOS-style **Live Activities** to Android via the **Live Updates API** introduced in Android 16. It's a background service that catches specific notifications—like 2FA codes, downloads, and music—and promotes them into a unified, persistent status chip at the top of the screen.
 
 ---
 
