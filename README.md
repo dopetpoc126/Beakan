@@ -13,21 +13,21 @@
 Beakan runs a `NotificationListenerService` in the background. It watches the notification stream, filters for the stuff that matters, and decides what to show based on priority. The UI is completely decoupled from this service.
 
 ```mermaid
-graph TD
+flowchart TD
     System[System Notification Stream] -->|Intercept| Listener[MediaNotificationListener]
     
     Listener -->|Route| Extractor{Extraction Engine}
     
-    Extractor -->|Regex/ NLP| OTP[OtpExtractor]
+    Extractor -->|Regex| OTP[OtpExtractor]
     Extractor -->|Bundle Analysis| DL[DownloadTracker]
-    Extractor -->|Session Token| Media[MediaController]
+    Extractor -->|Session Bound| Media[MediaController]
     
-    OTP -->|State Update| Manager[LiveActivityManager]
-    DL -->|State Update| Manager
-    Media -->|State Update| Manager
+    OTP -->|P0 Signal| Manager[LiveActivityManager]
+    DL -->|P1 Signal| Manager
+    Media -->|P2 Signal| Manager
     
-    Manager -->|Arbitration (Priority Logic)| Publisher[NotificationPublisher]
-    Publisher -->|Post| SystemBar[System Status Bar]
+    Manager -->|Arbitrate| Publisher[NotificationPublisher]
+    Publisher -->|Render| SystemBar[System Status Bar]
 ```
 
 ## Core Modules
@@ -44,7 +44,24 @@ For 2FA codes, we run a local parser on notification text.
 -   **Privacy**: Everything happens in memory. No data is saved or sent anywhere.
 
 ### 3. State Manager (`LiveActivityManager`)
-This component decides what to show when multiple things happen at once. It uses a simple priority stack:
+This component decides what to show when multiple things happen at once.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Idle
+    
+    Idle --> Media: Playback Started (P2)
+    Media --> Download: Download Started (P1)
+    
+    Download --> OTP: 2FA Code Received (P0)
+    Media --> OTP: 2FA Code Received (P0)
+    
+    OTP --> Download: 30s Timeout / Dismiss
+    OTP --> Media: 30s Timeout / Dismiss
+    
+    Download --> Media: Download Complete
+    Media --> Idle: Session End
+```
 
 | Priority | Type | Behavior |
 | :--- | :--- | :--- |
