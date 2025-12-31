@@ -83,8 +83,8 @@ We don't just scrape the notification title. Beakan looks for a `MediaSession` t
 
 ## Known Bugs & Limitations
 
--   **State Desynchronization ("Zombie Activities")**: In rare race conditions, the Live Activity overlay may persist after the originating event (e.g., file download, media session) has concluded. This is due to latency in the `NotificationListenerService` callbacks.
 -   **Parsing Reliability**: OTP extraction relies on regex heuristics and may fail with non-standard SMS formats or specific regional banking apps.
+-   **Missing Media Names**: Some media titles (especially those with special characters or non-Latin scripts) may appear as "Playing" or empty in the status bar chip due to over-aggressive text sanitization.
 -   **Animation Jitter**: Layout transitions may exhibit frame drops on 60Hz displays or constrained emulator environments.
 
 ## Installation Warnings

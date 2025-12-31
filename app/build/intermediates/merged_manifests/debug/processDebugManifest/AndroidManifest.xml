@@ -46,6 +46,7 @@
         <service
             android:name="com.example.livemedia.MediaNotificationListener"
             android:exported="true"
+            android:foregroundServiceType="mediaPlayback"
             android:label="@string/service_name"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" >
             <intent-filter>

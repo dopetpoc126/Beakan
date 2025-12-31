@@ -55,24 +55,28 @@ object OtpExtractor {
     // --- Extraction Logic ---
 
     fun extract(text: String): String? {
-        val cleanText = text.trim()
-        
-        // Run logical stages. Order implies priority.
-        
-        // Stage 1: Keyword Anchored (High Confidence)
-        findMatch(STAGE_1_KEYWORD_ANCHORED, cleanText)?.let { return it }
-
-        // Stage 4: Prefix (High Confidence specific form) - Moved up as it's specific
-        findMatch(STAGE_4_PREFIX, cleanText)?.let { return it }
-
-        // Stage 2: Strict Numeric (Medium Confidence)
-        findMatch(STAGE_2_STRICT_NUMERIC, cleanText)?.let { return it }
-
-        // Stage 3: Broad (Low Confidence - Use only if we have context elsewhere or desperate)
-        // Only run Stage 3 if the text actually contains one of the mandatory keywords
-        // (User's context requirement)
-        if (containsKeyword(cleanText)) {
-            findMatch(STAGE_3_BROAD, cleanText)?.let { return it }
+        try {
+            val cleanText = text.trim()
+            
+            // Run logical stages. Order implies priority.
+            
+            // Stage 1: Keyword Anchored (High Confidence)
+            findMatch(STAGE_1_KEYWORD_ANCHORED, cleanText)?.let { return it }
+    
+            // Stage 4: Prefix (High Confidence specific form) - Moved up as it's specific
+            findMatch(STAGE_4_PREFIX, cleanText)?.let { return it }
+    
+            // Stage 2: Strict Numeric (Medium Confidence)
+            findMatch(STAGE_2_STRICT_NUMERIC, cleanText)?.let { return it }
+    
+            // Stage 3: Broad (Low Confidence - Use only if we have context elsewhere or desperate)
+            // Only run Stage 3 if the text actually contains one of the mandatory keywords
+            // (User's context requirement)
+            if (containsKeyword(cleanText)) {
+                findMatch(STAGE_3_BROAD, cleanText)?.let { return it }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
 
         return null

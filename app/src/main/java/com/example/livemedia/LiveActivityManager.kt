@@ -9,7 +9,11 @@ import android.os.SystemClock
  * Manages the state and priority of different Live Activities (Media, OTP, Downloads).
  * Priority: OTP > Download > Media
  */
-class LiveActivityManager {
+/**
+ * Manages the state and priority of different Live Activities (Media, OTP, Downloads).
+ * Priority: OTP > Download > Media
+ */
+object LiveActivityManager {
 
     // --- State Definitions ---
     data class MediaState(

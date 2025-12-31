@@ -12,6 +12,7 @@ import android.os.Handler
 import android.os.Looper
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import kotlinx.coroutines.*
 import kotlin.math.abs
 
 /**
@@ -20,7 +21,7 @@ import kotlin.math.abs
 class MediaNotificationListener : NotificationListenerService() {
 
     private lateinit var publisher: NotificationPublisher
-    private val liveActivityManager = LiveActivityManager()
+    // LiveActivityManager is now a Singleton Object
 
     
     // Media Specifics
@@ -35,6 +36,7 @@ class MediaNotificationListener : NotificationListenerService() {
     private var lastPublishedState: LiveActivityManager.PublishedState? = null
     
     private val handler = Handler(Looper.getMainLooper())
+    private val serviceScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     // 30 Seconds for OTP, so we need faster updates to show countdown smoothly? 
     // The Progress bar max is 30, so 1 update per sec is fine.
     // For downloads, 1 sec is also fine.
@@ -45,12 +47,7 @@ class MediaNotificationListener : NotificationListenerService() {
         private const val EXTRA_OTP_CODE = "otp_code"
     }
     
-    private val updateRunnable = object : Runnable {
-        override fun run() {
-            updateLiveActivity()
-            handler.postDelayed(this, TICK_INTERVAL_MS)
-        }
-    }
+    // Removed updateRunnable in favor of Coroutine Loop
 
     private val controllerCallback = object : MediaController.Callback() {
         override fun onPlaybackStateChanged(state: PlaybackState?) {
@@ -77,12 +74,12 @@ class MediaNotificationListener : NotificationListenerService() {
                 clipboard.setPrimaryClip(clip)
             } else if (intent?.action == NotificationPublisher.ACTION_NOTIFICATION_DISMISSED) {
                 // User swiped it away. Clear all states.
-                liveActivityManager.updateMediaState(null)
-                liveActivityManager.clearOtpState()
+                LiveActivityManager.updateMediaState(null)
+                LiveActivityManager.clearOtpState()
                 // For downloads, we might want to keep tracking internally, but stop showing the chip.
                 // Resetting download state is safest to stop reposting.
-                val pkg = liveActivityManager.getBestState()?.sourcePackage
-                if (pkg != null) liveActivityManager.clearDownloadState(pkg)
+                val pkg = LiveActivityManager.getBestState()?.sourcePackage
+                if (pkg != null) LiveActivityManager.clearDownloadState(pkg)
                 
                 // Clear the actual notification just in case
                 publisher.cancelNotification()
@@ -104,11 +101,16 @@ class MediaNotificationListener : NotificationListenerService() {
         registerReceiver(copyReceiver, filter, android.content.Context.RECEIVER_NOT_EXPORTED)
         
         // Start the eternal tick loop
-        handler.post(updateRunnable)
+        serviceScope.launch {
+            while (isActive) {
+                updateLiveActivity()
+                delay(TICK_INTERVAL_MS)
+            }
+        }
     }
 
     override fun onDestroy() {
-        handler.removeCallbacks(updateRunnable)
+        serviceScope.cancel()
         unregisterReceiver(copyReceiver)
         releaseController()
         publisher.cancelNotification()
@@ -121,48 +123,51 @@ class MediaNotificationListener : NotificationListenerService() {
     }
 
     private fun updateLiveActivity() {
-        // 1. Update Media State (in case position changed naturally)
-        if (activeController != null) updateMediaState()
-        
-        // 2. Get Best State
-        val state = liveActivityManager.getBestState()
-        
-        // Optimization: Skip update if state is identical
-        if (state == lastPublishedState) return
-        lastPublishedState = state // Update cache
-        
-        // 3. Publish
-        if (state != null) {
+        // Run on Background to avoid Jitter
+        serviceScope.launch(Dispatchers.Default) {
+             // 1. Update Media State (in case position changed naturally)
+            if (activeController != null) updateMediaState()
             
-            // Logic to inject specific actions
-            var finalActions = state.actions
-            if (state.isOtp) {
-                 finalActions = listOf(createCopyAction(state.artist)) // artist holds the code
-            }
-
-            publisher.updateNotification(
-                notificationId = NotificationPublisher.BASE_NOTIFICATION_ID, 
-                title = state.title,
-                artist = state.artist,
-                bitmap = state.bitmap,
-                token = state.token,
-                isPlaying = state.isPlaying,
-                actions = finalActions,
-                sourcePackage = state.sourcePackage,
-                launchIntent = activeNotifications?.find { it.packageName == state.sourcePackage }?.notification?.contentIntent,
-                duration = state.duration,
-                position = state.position,
-                overrideChipText = state.chipText,
-                skipMediaFilter = state.isOtp || state.isDownload,
-                isOtp = state.isOtp,
-                isDownload = state.isDownload
-            )
-        } else {
-
-            if (lastPublishedState != null) {
-                // Only cancel if we were previously showing something
-                publisher.cancelNotification()
-                lastPublishedState = null
+            // 2. Get Best State
+            val state = LiveActivityManager.getBestState()
+            
+            // Optimization: Skip update if state is identical
+            if (state == lastPublishedState) return@launch
+            lastPublishedState = state // Update cache
+            
+            // 3. Publish
+            if (state != null) {
+                
+                // Logic to inject specific actions
+                var finalActions = state.actions
+                if (state.isOtp) {
+                     finalActions = listOf(createCopyAction(state.artist)) // artist holds the code
+                }
+    
+                publisher.updateNotification(
+                    notificationId = NotificationPublisher.BASE_NOTIFICATION_ID, 
+                    title = state.title,
+                    artist = state.artist,
+                    bitmap = state.bitmap,
+                    token = state.token,
+                    isPlaying = state.isPlaying,
+                    actions = finalActions,
+                    sourcePackage = state.sourcePackage,
+                    launchIntent = activeNotifications?.find { it.packageName == state.sourcePackage }?.notification?.contentIntent,
+                    duration = state.duration,
+                    position = state.position,
+                    overrideChipText = state.chipText,
+                    skipMediaFilter = state.isOtp || state.isDownload,
+                    isOtp = state.isOtp,
+                    isDownload = state.isDownload
+                )
+            } else {
+    
+                if (lastPublishedState != null) {
+                    // Only cancel if we were previously showing something
+                    publisher.cancelNotification()
+                    lastPublishedState = null
+                }
             }
         }
     }
@@ -188,7 +193,7 @@ class MediaNotificationListener : NotificationListenerService() {
     private fun updateMediaState() {
         val controller = activeController
         if (controller == null) {
-            liveActivityManager.updateMediaState(null)
+            LiveActivityManager.updateMediaState(null)
             return
         }
 
@@ -204,7 +209,7 @@ class MediaNotificationListener : NotificationListenerService() {
         // Filter out junk
         if (title.isNullOrBlank()) return
 
-        liveActivityManager.updateMediaState(
+        LiveActivityManager.updateMediaState(
             LiveActivityManager.MediaState(
                 title = title,
                 artist = metadata.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: "",
@@ -257,9 +262,9 @@ class MediaNotificationListener : NotificationListenerService() {
         val text = sb.toString()
         
         OtpExtractor.extract(text)?.let { code ->
-            liveActivityManager.updateOtpState(code, sbn.packageName)
-            // Force immediate update
-            handler.post { updateLiveActivity() }
+            LiveActivityManager.updateOtpState(code, sbn.packageName)
+            // Force immediate update (runs via coroutine inside)
+            updateLiveActivity()
         }
     }
     
@@ -277,18 +282,18 @@ class MediaNotificationListener : NotificationListenerService() {
                     // Optimized: Avoid copying array to list if possible, or use lightweight wrapper
                     val actionsArray = sbn.notification.actions
                     val actions = if (actionsArray != null) java.util.Arrays.asList(*actionsArray) else emptyList()
-                    liveActivityManager.updateDownloadState(sbn.packageName, title, current, max, actions, sbn.id)
+                    LiveActivityManager.updateDownloadState(sbn.packageName, title, current, max, actions, sbn.id)
                     return
                 }
             }
         }
         // If we reach here, it's not a valid download update.
         // If this specific notification was the active download, clear it.
-        liveActivityManager.tryClearDownloadState(sbn.packageName, sbn.id)
+        LiveActivityManager.tryClearDownloadState(sbn.packageName, sbn.id)
     }
     
     private fun checkForDownloadRemoval(sbn: StatusBarNotification) {
-        liveActivityManager.clearDownloadState(sbn.packageName)
+        LiveActivityManager.clearDownloadState(sbn.packageName)
     }
 
     private fun handleMediaNotification(sbn: StatusBarNotification) {
@@ -343,20 +348,20 @@ class MediaNotificationListener : NotificationListenerService() {
         }
         
         updateMediaState()
-        handler.post { updateLiveActivity() }
+        updateLiveActivity()
     }
     
     private fun releaseController() {
         runCatching { activeController?.unregisterCallback(controllerCallback) }
         activeController = null
         activeToken = null
-        liveActivityManager.updateMediaState(null)
+        LiveActivityManager.updateMediaState(null)
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         // 1. Check if User dismissed OUR notification
         if (sbn.packageName == packageName && sbn.id == NotificationPublisher.BASE_NOTIFICATION_ID) {
-            liveActivityManager.clearOtpState()
+            LiveActivityManager.clearOtpState()
             // We might want to clear downloads too? The user verified "otp notification".
             // Let's assume swipe means "Stop showing me this", so clearing OTP is safe. 
             // If download is running, it might pop back up? LiveActivityManager prioritizes OTP. 
