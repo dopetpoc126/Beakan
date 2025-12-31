@@ -1,7 +1,7 @@
 # Beakan
 
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.0-purple.svg?style=flat&logo=kotlin)](https://kotlinlang.org)
-[![API](https://img.shields.io/badge/API-26%2B-brightgreen.svg?style=flat&logo=android)](https://android-arsenal.com/api?level=26)
+[![API](https://img.shields.io/badge/API-35%2B-brightgreen.svg?style=flat&logo=android)](https://android-arsenal.com/api?level=35)
 [![Service](https://img.shields.io/badge/Architecture-Service%20Layer-orange.svg?style=flat&logo=android)](https://developer.android.com/guide/components/services)
 
 **Beakan** is a **Proof-of-Concept (POC)** implementing the new **"Live Updates"** feature (technically the **Rich Ongoing Notifications** API, introduced in Android 15 QPR) to replicate iOS-style functionality. It leverages deep system services to intercept high-priority events—such as 2FA codes, active downloads, and media sessions—and promotes them into a unified, interactive status bar chip.
