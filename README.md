@@ -80,12 +80,7 @@ We don't just scrape the notification title. Beakan looks for a `MediaSession` t
 
 > [!WARNING]
 > **OEM Compatibility**: This project is strictly calibrated for **AOSP System UI** behavior. Heavily modified OEM skins (e.g., **Samsung One UI**, **Xiaomi HyperOS**, **ColorOS**) are **not supported**. These environments implement non-standard status bar layouts and aggressive background process termination policies that may break the overlay or kill the service unexpectedly.
-
-## Known Bugs & Limitations
-
--   **Parsing Reliability**: OTP extraction relies on regex heuristics and may fail with non-standard SMS formats or specific regional banking apps.
--   **Missing Media Names**: Some media titles (especially those with special characters or non-Latin scripts) may appear as "Playing" or empty in the status bar chip due to over-aggressive text sanitization.
--   **Animation Jitter**: Layout transitions may exhibit frame drops on 60Hz displays or constrained emulator environments.
+: Layout transitions may exhibit frame drops on 60Hz displays or constrained emulator environments.
 
 ## Installation Warnings
 
