@@ -4,7 +4,7 @@
 [![API](https://img.shields.io/badge/API-26%2B-brightgreen.svg?style=flat&logo=android)](https://android-arsenal.com/api?level=26)
 [![Service](https://img.shields.io/badge/Architecture-Service%20Layer-orange.svg?style=flat&logo=android)](https://developer.android.com/guide/components/services)
 
-**Beakan** is a **Proof-of-Concept (POC)** research prototype exploring iOS-style **Live Activities** on Android. It leverages deep system services to intercept high-priority events—such as 2FA codes, active downloads, and media sessions—and promotes them into a unified, interactive status bar overlay.
+**Beakan** is a **Proof-of-Concept (POC)** implementing the new **"Live Updates"** feature (technically the **Rich Ongoing Notifications** API, introduced in Android 15 QPR) to replicate iOS-style functionality. It leverages deep system services to intercept high-priority events—such as 2FA codes, active downloads, and media sessions—and promotes them into a unified, interactive status bar chip.
 
 > [!CAUTION]
 > **Research Prototype**: This is experimental software designed for developers and enthusiasts. It is **not** a production-ready application.
