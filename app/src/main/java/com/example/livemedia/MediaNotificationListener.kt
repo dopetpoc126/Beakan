@@ -21,13 +21,18 @@ class MediaNotificationListener : NotificationListenerService() {
 
     private lateinit var publisher: NotificationPublisher
     private val liveActivityManager = LiveActivityManager()
+
     
     // Media Specifics
     private var activeSourcePackage: String? = null
+    private var activeSourceNotificationId: Int? = null
     private var activeToken: MediaSession.Token? = null
     private var activeController: MediaController? = null
     private var cachedActions: List<Notification.Action> = emptyList()
     private var cachedLargeIcon: Bitmap? = null
+    
+    // Optimization: Cache last published state to avoid redundant notification updates
+    private var lastPublishedState: LiveActivityManager.PublishedState? = null
     
     private val handler = Handler(Looper.getMainLooper())
     // 30 Seconds for OTP, so we need faster updates to show countdown smoothly? 
@@ -70,6 +75,18 @@ class MediaNotificationListener : NotificationListenerService() {
                 val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                 val clip = android.content.ClipData.newPlainText("OTP", code)
                 clipboard.setPrimaryClip(clip)
+            } else if (intent?.action == NotificationPublisher.ACTION_NOTIFICATION_DISMISSED) {
+                // User swiped it away. Clear all states.
+                liveActivityManager.updateMediaState(null)
+                liveActivityManager.clearOtpState()
+                // For downloads, we might want to keep tracking internally, but stop showing the chip.
+                // Resetting download state is safest to stop reposting.
+                val pkg = liveActivityManager.getBestState()?.sourcePackage
+                if (pkg != null) liveActivityManager.clearDownloadState(pkg)
+                
+                // Clear the actual notification just in case
+                publisher.cancelNotification()
+                lastPublishedState = null
             }
         }
     }
@@ -77,9 +94,13 @@ class MediaNotificationListener : NotificationListenerService() {
     override fun onCreate() {
         super.onCreate()
         publisher = NotificationPublisher(this)
+
         
-        // Register Copy Receiver
-        val filter = android.content.IntentFilter(ACTION_COPY_OTP)
+        // Register Receivers
+        val filter = android.content.IntentFilter().apply {
+            addAction(ACTION_COPY_OTP)
+            addAction(NotificationPublisher.ACTION_NOTIFICATION_DISMISSED)
+        }
         registerReceiver(copyReceiver, filter, android.content.Context.RECEIVER_NOT_EXPORTED)
         
         // Start the eternal tick loop
@@ -90,6 +111,7 @@ class MediaNotificationListener : NotificationListenerService() {
         handler.removeCallbacks(updateRunnable)
         unregisterReceiver(copyReceiver)
         releaseController()
+        publisher.cancelNotification()
         super.onDestroy()
     }
 
@@ -104,6 +126,10 @@ class MediaNotificationListener : NotificationListenerService() {
         
         // 2. Get Best State
         val state = liveActivityManager.getBestState()
+        
+        // Optimization: Skip update if state is identical
+        if (state == lastPublishedState) return
+        lastPublishedState = state // Update cache
         
         // 3. Publish
         if (state != null) {
@@ -128,10 +154,16 @@ class MediaNotificationListener : NotificationListenerService() {
                 position = state.position,
                 overrideChipText = state.chipText,
                 skipMediaFilter = state.isOtp || state.isDownload,
-                isNonMedia = state.isOtp || state.isDownload
+                isOtp = state.isOtp,
+                isDownload = state.isDownload
             )
         } else {
-            publisher.cancelNotification()
+
+            if (lastPublishedState != null) {
+                // Only cancel if we were previously showing something
+                publisher.cancelNotification()
+                lastPublishedState = null
+            }
         }
     }
     
@@ -199,17 +231,30 @@ class MediaNotificationListener : NotificationListenerService() {
         // 3. Check for Media
         if (isMediaNotification(sbn)) {
              handleMediaNotification(sbn)
+        } else if (sbn.packageName == activeSourcePackage && sbn.id == activeSourceNotificationId) {
+             // Active source updated specifically the media notification to a non-media state
+             releaseController()
+             activeSourcePackage = null
+             activeSourceNotificationId = null
+             handler.postDelayed({ findActiveMedia() }, 300L)
         }
     }
     
     private fun checkForOtp(sbn: StatusBarNotification) {
         val extras = sbn.notification.extras
         // Combine Title, Text and BigText for full context
-        val text = listOf(
-            extras.getCharSequence(Notification.EXTRA_TITLE),
-            extras.getCharSequence(Notification.EXTRA_TEXT),
-            extras.getCharSequence(Notification.EXTRA_BIG_TEXT)
-        ).filterNotNull().joinToString(" ")
+        // Optimized: Avoid allocations (List, Filter, Join)
+        val sb = StringBuilder()
+        val title = extras.getCharSequence(Notification.EXTRA_TITLE)
+        if (!title.isNullOrEmpty()) sb.append(title).append(" ")
+        
+        val textContent = extras.getCharSequence(Notification.EXTRA_TEXT)
+        if (!textContent.isNullOrEmpty()) sb.append(textContent).append(" ")
+        
+        val bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)
+        if (!bigText.isNullOrEmpty()) sb.append(bigText)
+        
+        val text = sb.toString()
         
         OtpExtractor.extract(text)?.let { code ->
             liveActivityManager.updateOtpState(code, sbn.packageName)
@@ -222,18 +267,24 @@ class MediaNotificationListener : NotificationListenerService() {
         val extras = sbn.notification.extras
         if (extras.containsKey(Notification.EXTRA_PROGRESS)) {
             val max = extras.getInt(Notification.EXTRA_PROGRESS_MAX)
-            val current = extras.getInt(Notification.EXTRA_PROGRESS)
             val indeterminate = extras.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE)
             
             if (max > 0 && !indeterminate) {
                 // Ignore if it looks like a media music player track progress (usually handled by media session)
                 if (!isMediaNotification(sbn)) {
+                    val current = extras.getInt(Notification.EXTRA_PROGRESS)
                     val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: "Downloading..."
-                    val actions = sbn.notification.actions?.toList() ?: emptyList()
-                    liveActivityManager.updateDownloadState(sbn.packageName, title, current, max, actions)
+                    // Optimized: Avoid copying array to list if possible, or use lightweight wrapper
+                    val actionsArray = sbn.notification.actions
+                    val actions = if (actionsArray != null) java.util.Arrays.asList(*actionsArray) else emptyList()
+                    liveActivityManager.updateDownloadState(sbn.packageName, title, current, max, actions, sbn.id)
+                    return
                 }
             }
         }
+        // If we reach here, it's not a valid download update.
+        // If this specific notification was the active download, clear it.
+        liveActivityManager.tryClearDownloadState(sbn.packageName, sbn.id)
     }
     
     private fun checkForDownloadRemoval(sbn: StatusBarNotification) {
@@ -282,6 +333,7 @@ class MediaNotificationListener : NotificationListenerService() {
         releaseController()
         
         activeSourcePackage = sbn.packageName
+        activeSourceNotificationId = sbn.id
         activeToken = token
         cachedActions = sbn.notification.actions?.toList() ?: emptyList()
         updateLargeIcon(sbn)
@@ -315,9 +367,14 @@ class MediaNotificationListener : NotificationListenerService() {
         checkForDownloadRemoval(sbn)
         
         if (sbn.packageName == activeSourcePackage) {
-            releaseController()
-            activeSourcePackage = null
-            handler.postDelayed({ findActiveMedia() }, 300L)
+            // Only release if the removed notification IS the media notification
+            // Or if we don't track ID yet (shouldn't happen)
+            if (activeSourceNotificationId == null || sbn.id == activeSourceNotificationId) {
+                releaseController()
+                activeSourcePackage = null
+                activeSourceNotificationId = null
+                handler.postDelayed({ findActiveMedia() }, 300L)
+            }
         }
     }
     

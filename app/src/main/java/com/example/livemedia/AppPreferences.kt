@@ -24,10 +24,9 @@ class AppPreferences(context: Context) {
     }
 
     fun isPackageSelected(packageName: String): Boolean {
-        // Default to TRUE for testing if empty, or enforce selection?
-        // Let's enforce selection to follow user requirement "choose their installed media apps"
         val selected = getSelectedPackages()
-        if (selected.isEmpty()) return false // Or true if we want auto-enable
+        // If no apps are explicitly selected, allow ALL apps (better first-time UX)
+        if (selected.isEmpty()) return true
         return selected.contains(packageName)
     }
 }

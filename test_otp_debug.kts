@@ -17,7 +17,8 @@ object OtpExtractorStub {
     val STAGE_2 = Pattern.compile("(?<!\\d)(\\d{6})(?!\\d)", FLAGS)
     
     // Stage 3: Broad
-    val STAGE_3 = Pattern.compile("(?<!\\w)(\\d{4,8}|[A-Z0-9]{4,10})(?!\\w)", FLAGS)
+    // Stage 3: Broad (Updated with Negative Lookahead)
+    val STAGE_3 = Pattern.compile("(?<!\\w)(\\d{4,8}|(?![A-Z]+\\b)[A-Z0-9]{4,10})(?!\\w)", FLAGS)
     
     // Stage 4: Prefix
     val STAGE_4 = Pattern.compile("(?:otp|code|pin|pass)\\s*[:\\-]?\\s*(\\d{4,8})", FLAGS)
@@ -56,7 +57,13 @@ val cases = listOf(
     "Your verification code for Instagram is 445566",
     "G-456123 is your Google verification code",
     "Use 5544 to login",
-    "PIN: 9988"
+    "PIN: 9988",
+    // False Positive Checks:
+    "Please login to your account via the link below. CLICK HERE to proceed.",
+    "Your access token has expired. PLEASE RENEW.",
+    "Authentication required. STATUS: PENDING.",
+    "Verify your email address. OPEN LINK.",
+    "Login detected. WAS THIS YOU?"
 )
 
 println("=== OTP Extractor Debug (FIXED) ===\n")

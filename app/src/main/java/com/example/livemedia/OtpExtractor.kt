@@ -33,16 +33,15 @@ object OtpExtractor {
 
     // 3) SECONDARY BROAD OTP CATCHER (LAST RESORT)
     // Matches various formats if surrounded by validation boundaries
+    // FIX: Removed pure alphabetic matching to avoid capturing words like "CLICK", "HERE", "TRUE".
+    // FIX: Alphanumeric and Hex must now contain at least one digit.
     private val STAGE_3_BROAD = Pattern.compile(
         "(?<!\\w)(" +
         "\\d{4,8}|" +                       // numeric
-        "[A-Z]{4,8}|" +                     // alphabetic
-        "[A-Z0-9]{4,10}|" +                 // alphanumeric
-        "[A-F0-9]{6,8}|" +                  // hex
+        "(?![A-Z]+\\b)[A-Z0-9]{4,10}|" +    // alphanumeric (Negative lookahead: NOT pure alpha)
         "\\d{3}[-\\s]\\d{3}|" +             // grouped numeric (123-456)
         "\\d{2}[-\\s]\\d{2}[-\\s]\\d{2}|" + // grouped (12-34-56)
-        "(?:\\d\\s){3,7}\\d|" +             // spaced digits (1 2 3 4 5 6)
-        "[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{4,8}" + // human-safe OTPs
+        "(?:\\d\\s){3,7}\\d" +              // spaced digits (1 2 3 4 5 6)
         ")(?!\\w)", 
         FLAGS
     )
@@ -95,7 +94,15 @@ object OtpExtractor {
     }
 
     private fun cleanCandidate(candidate: String): String {
-        return candidate.replace(Regex("[^A-Z0-9]"), "") // Remove spaces/dashes
+        // Optimized: Avoid Regex compilation for simple character filtering.
+        // O(N) single pass.
+        val sb = StringBuilder(candidate.length)
+        for (char in candidate) {
+            if (char.isDigit() || (char >= 'A' && char <= 'Z')) {
+                sb.append(char)
+            }
+        }
+        return sb.toString()
     }
 
     private fun containsKeyword(text: String): Boolean {
@@ -133,6 +140,23 @@ object OtpExtractor {
         // Time: HH:MM format usually caught by context, but strictly, regex handles colon.
         
         // 5. Appears multiple times (e.g. "Call 555-5555" repeated) - Complex strictness, skipping for now to favor speed.
+        
+        // 6. Hyphenated Prefix Check (Fix for IDs like "JK-620016-P")
+        // If the match is preceded by a hyphen, ensure the word before the hyphen is a valid keyword.
+        if (matchStart > 0 && text[matchStart - 1] == '-') {
+            // Scan backwards to find the word attached to the hyphen
+            var i = matchStart - 2
+            while (i >= 0 && (text[i].isLetterOrDigit())) {
+                i--
+            }
+            val prefix = text.substring(i + 1, matchStart - 1)
+            
+            // If we have a prefix, it MUST be a keyword (e.g. "OTP-12345"). 
+            // If it's random (e.g. "JK-12345"), reject it.
+            if (prefix.isNotEmpty() && !Pattern.compile(KEYWORDS, FLAGS).matcher(prefix).find()) {
+                return false
+            }
+        }
 
         return true
     }

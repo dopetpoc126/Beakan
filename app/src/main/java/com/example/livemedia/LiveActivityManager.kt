@@ -36,6 +36,7 @@ class LiveActivityManager {
         val title: String,
         val progressCurrent: Int,
         val progressMax: Int,
+        val notificationId: Int,
         val lastUpdated: Long = SystemClock.elapsedRealtime(),
         val sourceActions: List<Notification.Action> = emptyList()
     )
@@ -48,6 +49,8 @@ class LiveActivityManager {
     // --- Updates ---
 
     fun updateMediaState(state: MediaState?) {
+        // Optimization: Avoid churn if identical (Data class equals works)
+        if (this.mediaState == state) return
         mediaState = state
     }
 
@@ -64,9 +67,23 @@ class LiveActivityManager {
         otpState = null
     }
 
-    fun updateDownloadState(pkg: String, title: String, current: Int, max: Int, actions: List<Notification.Action>) {
+    fun updateDownloadState(pkg: String, title: String, current: Int, max: Int, actions: List<Notification.Action>, notificationId: Int) {
         if (max <= 0) return // Invalid or indeterminate
-        downloadState = DownloadState(pkg, title, current, max, sourceActions = actions)
+        
+        // Optimization: Check for equality before assignment? 
+        // Need to handle 'lastUpdated' carefully. If we just update 'lastUpdated' but progress is same, is it worth it?
+        // Let's create the candidate.
+        // If progress is same, we might not want to update 'lastUpdated' to keep timeout logic logic?
+        // Actually, if download is progressing, 'current' changes. If stalled, 'current' same.
+        // If stalled, we update 'lastUpdated' to keep it alive? No, stalled usually means broken.
+        // Let's just blindly update for downloads as progress changes frequently.
+        downloadState = DownloadState(pkg, title, current, max, notificationId = notificationId, sourceActions = actions)
+    }
+
+    fun tryClearDownloadState(pkg: String, notificationId: Int) {
+        if (downloadState?.packageName == pkg && downloadState?.notificationId == notificationId) {
+            downloadState = null
+        }
     }
 
     fun clearDownloadState(pkg: String) {
@@ -93,7 +110,7 @@ class LiveActivityManager {
                 return PublishedState(
                     title = "Security Code",
                     artist = otp.code, // The code allows it to be readable
-                    bitmap = null, // Could add a lock icon if we had context
+                    bitmap = null, // Use the source app icon (Not available)
                     token = null,
                     isPlaying = true, // Keeps the progress bar moving if UI supports it
                     actions = emptyList(), // Handled by listener injection for Copy

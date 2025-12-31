@@ -24,6 +24,7 @@ class NotificationPublisher(private val context: Context) {
         const val BASE_NOTIFICATION_ID = 1001
         private const val NOTIFICATION_COLOR = "#1DB954"
         private const val CHIP_MAX_LENGTH = 15
+        const val ACTION_NOTIFICATION_DISMISSED = "com.example.livemedia.ACTION_NOTIFICATION_DISMISSED"
     }
 
     init { createChannel() }
@@ -54,7 +55,8 @@ class NotificationPublisher(private val context: Context) {
         position: Long = 0L,
         overrideChipText: String? = null,
         skipMediaFilter: Boolean = false,
-        isNonMedia: Boolean = false
+        isOtp: Boolean = false,
+        isDownload: Boolean = false
     ): Int {
         val pendingIntent = launchIntent ?: createLaunchIntent(sourcePackage)
         val chipText = overrideChipText ?: createChipText(title)
@@ -63,9 +65,9 @@ class NotificationPublisher(private val context: Context) {
         val finalActions = if (skipMediaFilter) actions else filterMediaActions(actions)
         
         val notification = if (Build.VERSION.SDK_INT >= 36) {
-            buildAndroid16Notification(title, artist, bitmap, chipText, pendingIntent, finalActions, duration, position, isNonMedia)
+            buildAndroid16Notification(title, artist, bitmap, chipText, pendingIntent, finalActions, duration, position, isOtp, isDownload)
         } else {
-            buildLegacyNotification(title, artist, bitmap, pendingIntent, finalActions, duration, position, isNonMedia)
+            buildLegacyNotification(title, artist, bitmap, pendingIntent, finalActions, duration, position, isOtp, isDownload)
         }
 
         if (currentNotificationId != notificationId) {
@@ -120,20 +122,29 @@ class NotificationPublisher(private val context: Context) {
         chipText: String, pendingIntent: PendingIntent?,
         actions: List<Notification.Action>,
         duration: Long, position: Long,
-        isNonMedia: Boolean
+        isOtp: Boolean,
+        isDownload: Boolean
     ): Notification {
         val max = if (duration > 0) (duration / 1000).toInt() else 100
         val progress = if (duration > 0) (position / 1000).toInt() else 0
         
-        // Use neutral icon for OTP/Download, play icon for media
-        val iconRes = if (isNonMedia) android.R.drawable.ic_popup_sync else android.R.drawable.ic_media_play
+        // Use static icons
+        val iconRes = when {
+            isOtp -> android.R.drawable.ic_lock_lock
+            isDownload -> android.R.drawable.stat_sys_download
+            else -> android.R.drawable.ic_media_play
+        }
         
-        return Notification.Builder(context, CHANNEL_ID)
-            .setSmallIcon(iconRes)
+        val builder = Notification.Builder(context, CHANNEL_ID)
+        builder.setSmallIcon(iconRes)
+
+
+        return builder
             .setContentTitle(title)
             .setContentText(artist)
             .setLargeIcon(bitmap)
             .setOngoing(true)
+            .setDeleteIntent(createDismissIntent())
             .setOnlyAlertOnce(true)
             .setCategory(Notification.CATEGORY_TRANSPORT)
             .setVisibility(Notification.VISIBILITY_PUBLIC)
@@ -144,8 +155,8 @@ class NotificationPublisher(private val context: Context) {
                 extras.putBoolean("android.requestPromotedOngoing", true)
                 pendingIntent?.let { setContentIntent(it) }
                 actions.forEach { action ->
-                    // For non-media (OTP/Download), preserve original label to show correct state (Pause/Resume)
-                    val label = if (isNonMedia) {
+                    // For non-media (OTP/Download), preserve original label
+                    val label = if (isOtp || isDownload) {
                         action.title?.toString() ?: ""
                     } else {
                         getActionLabel(action.title?.toString() ?: "")
@@ -160,19 +171,27 @@ class NotificationPublisher(private val context: Context) {
         title: String, artist: String, bitmap: Bitmap?,
         pendingIntent: PendingIntent?, actions: List<Notification.Action>,
         duration: Long, position: Long,
-        isNonMedia: Boolean
+        isOtp: Boolean,
+        isDownload: Boolean
     ): Notification {
         val max = if (duration > 0) (duration / 1000).toInt() else 100
         val progress = if (duration > 0) (position / 1000).toInt() else 0
         
-        val iconRes = if (isNonMedia) android.R.drawable.ic_popup_sync else android.R.drawable.ic_media_play
-        
-        return NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(iconRes)
+        val iconRes = when {
+            isOtp -> android.R.drawable.ic_lock_lock
+            isDownload -> android.R.drawable.stat_sys_download
+            else -> android.R.drawable.ic_media_play
+        }
+
+        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+        builder.setSmallIcon(iconRes)
+            
+        return builder
             .setContentTitle(title)
             .setContentText(artist)
             .setLargeIcon(bitmap)
             .setOngoing(true)
+            .setDeleteIntent(createDismissIntent()) // Detect when user clears it
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_TRANSPORT)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -183,8 +202,8 @@ class NotificationPublisher(private val context: Context) {
             .apply {
                 pendingIntent?.let { setContentIntent(it) }
                 actions.forEach { action ->
-                    // For non-media (OTP/Download), preserve original label to show correct state (Pause/Resume)
-                    val label = if (isNonMedia) {
+                    // For non-media (OTP/Download), preserve original label
+                    val label = if (isOtp || isDownload) {
                         action.title?.toString() ?: ""
                     } else {
                         getActionLabel(action.title?.toString() ?: "")
@@ -197,5 +216,15 @@ class NotificationPublisher(private val context: Context) {
 
     fun cancelNotification() {
         notificationManager.cancel(currentNotificationId)
+    }
+
+    private fun createDismissIntent(): PendingIntent {
+        val intent = android.content.Intent(ACTION_NOTIFICATION_DISMISSED).apply {
+            setPackage(context.packageName)
+        }
+        return PendingIntent.getBroadcast(
+            context, 0, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
     }
 }

@@ -41,6 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.Dp
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -400,17 +401,18 @@ fun HeroMorphingIcon() {
                 // Format: P0x, P0y, C0x, C0y, C1x, C1y, P1x, P1y
                 
                 // === WAVE (Sine) ===
-                // A1: Up Slope (10,50 -> 30,20)
-                // A2: Down Slope (30,20 -> 50,50)
-                // B1: Down Slope (50,50 -> 70,80)
-                // B2: Up Slope (70,80 -> 90,50)
+                // Precise Sine Approximation
+                // A1: Up Slope (10,50 -> 30,20) - Steep start, Flat peak
+                // A2: Down Slope (30,20 -> 50,50) - Flat peak, Steep end
+                // B1: Down Slope (50,50 -> 70,80) - Steep start, Flat trough
+                // B2: Up Slope (70,80 -> 90,50) - Flat trough, Steep end
                 val wave = listOf(
                     // Path A (Left Hump)
-                    10f,50f, 20f,20f, 25f,20f, 30f,20f, // A1
-                    30f,20f, 35f,20f, 40f,50f, 50f,50f, // A2
+                    10f,50f, 20f,35f, 20f,20f, 30f,20f, // A1
+                    30f,20f, 40f,20f, 40f,35f, 50f,50f, // A2
                     // Path B (Right Hump)
-                    50f,50f, 60f,80f, 65f,80f, 70f,80f, // B1
-                    70f,80f, 75f,80f, 80f,50f, 90f,50f  // B2
+                    50f,50f, 60f,65f, 60f,80f, 70f,80f, // B1
+                    70f,80f, 80f,80f, 80f,65f, 90f,50f  // B2
                 )
                 
                 // === SHIELD (OTP Symbol) ===
@@ -451,19 +453,35 @@ fun HeroMorphingIcon() {
                 fun s(x: Float) = x * scale
                 
                 // DRAW
-                // Path A
-                val pathA = Path()
-                pathA.moveTo(s(v(0)), s(v(1))) // P0
-                pathA.cubicTo(s(v(2)), s(v(3)), s(v(4)), s(v(5)), s(v(6)), s(v(7))) // A1
-                pathA.cubicTo(s(v(10)), s(v(11)), s(v(12)), s(v(13)), s(v(14)), s(v(15))) // A2
-                drawPath(pathA, Color.White, style = Stroke(width = s(8f), cap = StrokeCap.Round, join = StrokeJoin.Round))
+                // Combined Path for seamless joins
+                val path = Path()
+                // A1
+                path.moveTo(s(v(0)), s(v(1)))
+                path.cubicTo(s(v(2)), s(v(3)), s(v(4)), s(v(5)), s(v(6)), s(v(7)))
+                // A2
+                path.cubicTo(s(v(10)), s(v(11)), s(v(12)), s(v(13)), s(v(14)), s(v(15)))
+                // B1 - Connects smoothly from A2 end
+                // Note: For non-continuous shapes (if any), moveTo might be needed, 
+                // but all current shapes are continuous closed or connected loops.
+                // Shield: 80,20 connected. DL: A2 ends 50,85. B1 starts 30,55.
+                // DOWNLOAD IS NOT CONTINUOUS!
+                // We must check if B starts where A ends.
                 
-                // Path B
-                val pathB = Path()
-                pathB.moveTo(s(v(16)), s(v(17))) // P0
-                pathB.cubicTo(s(v(18)), s(v(19)), s(v(20)), s(v(21)), s(v(22)), s(v(23))) // B1
-                pathB.cubicTo(s(v(26)), s(v(27)), s(v(28)), s(v(29)), s(v(30)), s(v(31))) // B2
-                drawPath(pathB, Color.White, style = Stroke(width = s(8f), cap = StrokeCap.Round, join = StrokeJoin.Round))
+                // Check continuity at the junction (Index 14,15 vs 16,17)
+                val aEnd = Offset(v(14), v(15))
+                val bStart = Offset(v(16), v(17))
+                val isContinuous = (aEnd - bStart).getDistance() < 1f
+                
+                if (!isContinuous) {
+                    path.moveTo(s(v(16)), s(v(17)))
+                }
+                
+                // B1
+                path.cubicTo(s(v(18)), s(v(19)), s(v(20)), s(v(21)), s(v(22)), s(v(23)))
+                // B2
+                path.cubicTo(s(v(26)), s(v(27)), s(v(28)), s(v(29)), s(v(30)), s(v(31)))
+                
+                drawPath(path, Color.White, style = Stroke(width = s(8f), cap = StrokeCap.Round, join = StrokeJoin.Round))
             }
         }
     }
@@ -875,3 +893,5 @@ private fun isNotificationServiceEnabled(context: Context): Boolean {
     val flat = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
     return flat?.contains(context.packageName) == true
 }
+
+
