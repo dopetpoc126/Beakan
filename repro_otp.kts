@@ -1,48 +1,32 @@
-package com.example.livemedia
 
 import java.util.regex.Pattern
 
-/**
- * Advanced OTP Extractor based on Production specifications.
- * Implements multi-stage regex matching and strict post-filtering.
- */
 object OtpExtractor {
 
     private const val FLAGS = Pattern.CASE_INSENSITIVE or Pattern.MULTILINE
 
-
     // Keywords for context filtering (used in regexes directly)
     private const val KEYWORDS = "otp|one[\\s-]?time|code|passcode|verification|verify|login|signin|sign-in|auth|authentication|security|confirm|confirmation|validate|access|token|secret|pin"
-
-    // Keywords that indicate a promo/marketing message (to avoid false positives)
-    private const val EXCLUDED_KEYWORDS = "checkout|off|discount|sale|deal|coupon|flat|upto|cashback|save|offer"
 
     // --- Regex Stages ---
 
     // 1) KEYWORD-ANCHORED OTP (PRIMARY — RUN FIRST)
-    // Matches keyword + 0-40 any chars (lazy) + Code (4-8 digits)
-    // FIX: Changed from [^\dA-Z]{0,40} to .{0,40}? because CASE_INSENSITIVE 
-    // makes [A-Z] reject lowercase letters like 'is' in "OTP is 433502"
     private val STAGE_1_KEYWORD_ANCHORED = Pattern.compile(
         "(?:$KEYWORDS).{0,40}?(\\d{4,8})", 
         FLAGS
     )
 
     // 2) STRICT NUMERIC OTP (BANK / GOVT FALLBACK)
-    // 6 digits surrounded by non-digits
     private val STAGE_2_STRICT_NUMERIC = Pattern.compile(
         "(?<!\\d)(\\d{6})(?!\\d)", 
         FLAGS
     )
 
     // 3) SECONDARY BROAD OTP CATCHER (LAST RESORT)
-    // Matches various formats if surrounded by validation boundaries
-    // FIX: Removed pure alphabetic matching to avoid capturing words like "CLICK", "HERE", "TRUE".
-    // FIX: Alphanumeric and Hex must now contain at least one digit.
     private val STAGE_3_BROAD = Pattern.compile(
         "(?<!\\w)(" +
         "\\d{4,8}|" +                       // numeric
-        "(?![A-Z]+\\b)[A-Z0-9]{4,10}|" +    // alphanumeric (Negative lookahead: NOT pure alpha)
+        "(?![A-Z]+\\b)[A-Z0-9]{4,10}|" +    // alphanumeric
         "\\d{3}[-\\s]\\d{3}|" +             // grouped numeric (123-456)
         "\\d{2}[-\\s]\\d{2}[-\\s]\\d{2}|" + // grouped (12-34-56)
         "(?:\\d\\s){3,7}\\d" +              // spaced digits (1 2 3 4 5 6)
@@ -62,22 +46,15 @@ object OtpExtractor {
         try {
             val cleanText = text.trim()
             
-            // Run logical stages. Order implies priority.
+            // Log matching attempts for debugging
+            println("Analyzing: '$cleanText'")
+
+            if (findMatch(STAGE_1_KEYWORD_ANCHORED, cleanText, "STAGE 1")?.let { return it } != null) return null
+            if (findMatch(STAGE_4_PREFIX, cleanText, "STAGE 4")?.let { return it } != null) return null
+            if (findMatch(STAGE_2_STRICT_NUMERIC, cleanText, "STAGE 2")?.let { return it } != null) return null
             
-            // Stage 1: Keyword Anchored (High Confidence)
-            findMatch(STAGE_1_KEYWORD_ANCHORED, cleanText)?.let { return it }
-    
-            // Stage 4: Prefix (High Confidence specific form) - Moved up as it's specific
-            findMatch(STAGE_4_PREFIX, cleanText)?.let { return it }
-    
-            // Stage 2: Strict Numeric (Medium Confidence)
-            findMatch(STAGE_2_STRICT_NUMERIC, cleanText)?.let { return it }
-    
-            // Stage 3: Broad (Low Confidence - Use only if we have context elsewhere or desperate)
-            // Only run Stage 3 if the text actually contains one of the mandatory keywords
-            // (User's context requirement)
             if (containsKeyword(cleanText)) {
-                findMatch(STAGE_3_BROAD, cleanText)?.let { return it }
+                if (findMatch(STAGE_3_BROAD, cleanText, "STAGE 3")?.let { return it } != null) return null
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -86,24 +63,26 @@ object OtpExtractor {
         return null
     }
 
-    private fun findMatch(pattern: Pattern, text: String): String? {
+    private fun findMatch(pattern: Pattern, text: String, stageName: String): String? {
         val matcher = pattern.matcher(text)
         while (matcher.find()) {
-            // Some patterns have capturing groups, others match the whole group 1/0
             val candidate = if (matcher.groupCount() >= 1) matcher.group(1) else matcher.group(0)
             val fullMatch = matcher.group(0)
             val start = matcher.start()
             
+            println("  [$stageName] Match found: '$candidate' (Full: '$fullMatch')")
+
             if (candidate != null && passesPostFilters(candidate, text, start, fullMatch)) {
+                println("    -> PASSED filters: $candidate")
                 return cleanCandidate(candidate)
+            } else {
+                println("    -> FAILED filters: $candidate")
             }
         }
         return null
     }
 
     private fun cleanCandidate(candidate: String): String {
-        // Optimized: Avoid Regex compilation for simple character filtering.
-        // O(N) single pass.
         val sb = StringBuilder(candidate.length)
         for (char in candidate) {
             if (char.isDigit() || (char >= 'A' && char <= 'Z')) {
@@ -114,64 +93,68 @@ object OtpExtractor {
     }
 
     private fun containsKeyword(text: String): Boolean {
-        // Quick check if any mandatory context keyword exists
         return Pattern.compile(KEYWORDS, FLAGS).matcher(text).find()
     }
 
     // --- Post-Filters ---
 
     private fun passesPostFilters(candidate: String, text: String, start: Int, fullMatch: String): Boolean {
-        // 1. Length Check (> 10)
         if (cleanCandidate(candidate).length > 10) return false
 
-        // 2. Reject if inside URL (Simple heuristic: looks for http/www before)
-        // Scan backwards 20 chars for http/www/://
         val lookbackStart = (start - 20).coerceAtLeast(0)
         val preText = text.substring(lookbackStart, start)
         if (preText.contains("http") || preText.contains("www") || preText.contains("://")) return false
 
-        // 3. Adjacent to currency (₹ $ € % , .)
-        // Check character immediately before (ignoring spaces)
-        val matchStart = text.indexOf(fullMatch, start) // robust start finding
+        val matchStart = text.indexOf(fullMatch, start)
         if (matchStart > 0) {
             val charBefore = text[matchStart - 1]
             if ("₹$€%,".contains(charBefore)) return false
-            // Check for "Rs." or "INR"
             if (text.substring((matchStart - 4).coerceAtLeast(0), matchStart).contains("Rs", true)) return false
         }
         
-        // 4. Looks like date/time
-        // Year: 19xx or 20xx
         if (candidate.startsWith("19") || candidate.startsWith("20")) {
              if (candidate.length == 4) return false 
         }
-        // Time: HH:MM format usually caught by context, but strictly, regex handles colon.
         
-        // 5. Appears multiple times (e.g. "Call 555-5555" repeated) - Complex strictness, skipping for now to favor speed.
-        
-        // 6. Hyphenated Prefix Check (Fix for IDs like "JK-620016-P")
-        // If the match is preceded by a hyphen, ensure the word before the hyphen is a valid keyword.
+        // Hyphenated Prefix Check
         if (matchStart > 0 && text[matchStart - 1] == '-') {
-            // Scan backwards to find the word attached to the hyphen
             var i = matchStart - 2
             while (i >= 0 && (text[i].isLetterOrDigit())) {
                 i--
             }
             val prefix = text.substring(i + 1, matchStart - 1)
             
+            println("    [Filter] Hyphen Prefix detected: '$prefix'")
+            
             // If we have a prefix, it MUST be a keyword (e.g. "OTP-12345"). 
             // EXCEPTION: Allow single letters (e.g. "G-12345" for Google)
             if (prefix.isNotEmpty() && prefix.length > 1 && !Pattern.compile(KEYWORDS, FLAGS).matcher(prefix).find()) {
+                println("    [Filter] Rejecting because prefix '$prefix' is not a keyword")
                 return false
             }
-        }
-
-        // 7. Promo/Marketing Filter
-        // If the text contains strong marketing keywords, assume it's a promo code, not an OTP.
-        if (Pattern.compile(EXCLUDED_KEYWORDS, FLAGS).matcher(text).find()) {
-            return false
         }
 
         return true
     }
 }
+
+fun main() {
+    val sender = "59029411"
+    val message = "G-016292 is your Google verification code. Don't share your code with anyone."
+    
+    // Simulate what the notification listener might produce
+    val combinedText = "$sender $message"
+    
+    val result = OtpExtractor.extract(combinedText)
+    println("\nFinal Result: $result")
+    
+    if (result == "016292") {
+        println("SUCCESS: Extracted generic OTP")
+    } else if (result == "59029411") {
+        println("FAILURE: Extracted Sender Number")
+    } else {
+        println("FAILURE: Unexpected result '$result'")
+    }
+}
+
+main()
