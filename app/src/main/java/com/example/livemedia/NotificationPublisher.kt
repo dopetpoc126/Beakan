@@ -56,18 +56,19 @@ class NotificationPublisher(private val context: Context) {
         overrideChipText: String? = null,
         skipMediaFilter: Boolean = false,
         isOtp: Boolean = false,
-        isDownload: Boolean = false
+        isDownload: Boolean = false,
+        isTorch: Boolean = false
     ): Int {
         val pendingIntent = launchIntent ?: createLaunchIntent(sourcePackage)
         val chipText = overrideChipText ?: createChipText(title)
         
-        // For OTP/Download, we pass actions directly. For media, we filter.
+        // For OTP/Download/Torch, we pass actions directly. For media, we filter.
         val finalActions = if (skipMediaFilter) actions else filterMediaActions(actions)
         
         val notification = if (Build.VERSION.SDK_INT >= 36) {
-            buildAndroid16Notification(title, artist, bitmap, chipText, pendingIntent, finalActions, duration, position, isOtp, isDownload)
+            buildAndroid16Notification(title, artist, bitmap, chipText, pendingIntent, finalActions, duration, position, isOtp, isDownload, isTorch)
         } else {
-            buildLegacyNotification(title, artist, bitmap, pendingIntent, finalActions, duration, position, isOtp, isDownload)
+            buildLegacyNotification(title, artist, bitmap, pendingIntent, finalActions, duration, position, isOtp, isDownload, isTorch)
         }
 
         if (currentNotificationId != notificationId) {
@@ -123,7 +124,8 @@ class NotificationPublisher(private val context: Context) {
         actions: List<Notification.Action>,
         duration: Long, position: Long,
         isOtp: Boolean,
-        isDownload: Boolean
+        isDownload: Boolean,
+        isTorch: Boolean
     ): Notification {
         val max = if (duration > 0) (duration / 1000).toInt() else 100
         val progress = if (duration > 0) (position / 1000).toInt() else 0
@@ -131,7 +133,14 @@ class NotificationPublisher(private val context: Context) {
         // Use static icons
         val iconRes = when {
             isOtp -> android.R.drawable.ic_lock_lock
-            isDownload -> android.R.drawable.stat_sys_download
+            isDownload -> {
+                 if (chipText.equals("Done", ignoreCase = true) || title.contains("Complete", ignoreCase = true)) {
+                     android.R.drawable.stat_sys_download_done 
+                 } else {
+                     android.R.drawable.stat_sys_download
+                 }
+            }
+            isTorch -> android.R.drawable.ic_lock_idle_charging // Lightning bolt for Torch
             else -> android.R.drawable.ic_media_play
         }
         
@@ -149,14 +158,19 @@ class NotificationPublisher(private val context: Context) {
             .setCategory(Notification.CATEGORY_TRANSPORT)
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setShortCriticalText(chipText)
-            .setProgress(max, progress, false)
+            // Hide progress for Torch
+            .apply {
+                if (!isTorch) {
+                     setProgress(max, progress, false)
+                }
+            }
             .setColor(Color.parseColor(NOTIFICATION_COLOR))
             .apply {
                 extras.putBoolean("android.requestPromotedOngoing", true)
                 pendingIntent?.let { setContentIntent(it) }
                 actions.forEach { action ->
-                    // For non-media (OTP/Download), preserve original label
-                    val label = if (isOtp || isDownload) {
+                    // For non-media (OTP/Download/Torch), preserve original label
+                    val label = if (isOtp || isDownload || isTorch) {
                         action.title?.toString() ?: ""
                     } else {
                         getActionLabel(action.title?.toString() ?: "")
@@ -172,14 +186,23 @@ class NotificationPublisher(private val context: Context) {
         pendingIntent: PendingIntent?, actions: List<Notification.Action>,
         duration: Long, position: Long,
         isOtp: Boolean,
-        isDownload: Boolean
+        isDownload: Boolean,
+        isTorch: Boolean
     ): Notification {
         val max = if (duration > 0) (duration / 1000).toInt() else 100
         val progress = if (duration > 0) (position / 1000).toInt() else 0
         
         val iconRes = when {
             isOtp -> android.R.drawable.ic_lock_lock
-            isDownload -> android.R.drawable.stat_sys_download
+            isDownload -> {
+                 // Check title or we'd need to pass chipText here too, but we can infer from title "Download Complete"
+                 if (title.contains("Complete", ignoreCase = true) || title.contains("Done", ignoreCase = true)) {
+                     android.R.drawable.stat_sys_download_done 
+                 } else {
+                     android.R.drawable.stat_sys_download
+                 }
+            }
+            isTorch -> android.R.drawable.ic_lock_idle_charging
             else -> android.R.drawable.ic_media_play
         }
 
@@ -198,12 +221,16 @@ class NotificationPublisher(private val context: Context) {
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setColorized(true)
             .setColor(Color.parseColor(NOTIFICATION_COLOR))
-            .setProgress(max, progress, false)
+            .apply {
+                if (!isTorch) {
+                    setProgress(max, progress, false)
+                }
+            }
             .apply {
                 pendingIntent?.let { setContentIntent(it) }
                 actions.forEach { action ->
-                    // For non-media (OTP/Download), preserve original label
-                    val label = if (isOtp || isDownload) {
+                    // For non-media (OTP/Download/Torch), preserve original label
+                    val label = if (isOtp || isDownload || isTorch) {
                         action.title?.toString() ?: ""
                     } else {
                         getActionLabel(action.title?.toString() ?: "")

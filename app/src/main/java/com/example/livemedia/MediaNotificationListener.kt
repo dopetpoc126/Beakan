@@ -12,6 +12,11 @@ import android.os.Handler
 import android.os.Looper
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import com.example.livemedia.handlers.TorchHandler
+import com.example.livemedia.handlers.OtpHandler
+import com.example.livemedia.handlers.DownloadHandler
+import com.example.livemedia.handlers.LiveActivityState
+import com.example.livemedia.handlers.LiveActivityType
 import kotlinx.coroutines.*
 import kotlin.math.abs
 
@@ -32,8 +37,16 @@ class MediaNotificationListener : NotificationListenerService() {
     private var cachedActions: List<Notification.Action> = emptyList()
     private var cachedLargeIcon: Bitmap? = null
     
+    // Handlers (modular architecture)
+    private lateinit var torchHandler: TorchHandler
+    private lateinit var otpHandler: OtpHandler
+    private lateinit var downloadHandler: DownloadHandler
+    
     // Optimization: Cache last published state to avoid redundant notification updates
     private var lastPublishedState: LiveActivityManager.PublishedState? = null
+    
+    // Track if ANY notification is currently showing (for proper cancellation)
+    private var isNotificationShowing: Boolean = false
     
     private val handler = Handler(Looper.getMainLooper())
     private val serviceScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
@@ -43,9 +56,15 @@ class MediaNotificationListener : NotificationListenerService() {
     
     companion object {
         private const val TICK_INTERVAL_MS = 1000L
-        private const val ACTION_COPY_OTP = "com.example.livemedia.ACTION_COPY_OTP"
-        private const val EXTRA_OTP_CODE = "otp_code"
+        private const val ACTION_RESUME_MEDIA = "com.example.livemedia.ACTION_RESUME_MEDIA"
+        private const val EXTRA_PACKAGE_NAME = "package_name"
     }
+    
+    // Caches for resumption
+    private var cachedMetadata: MediaMetadata? = null
+    private var cachedTitle: String = ""
+    private var cachedArtist: String = ""
+    private var cachedDuration: Long = 0L
     
     // Removed updateRunnable in favor of Coroutine Loop
 
@@ -54,35 +73,55 @@ class MediaNotificationListener : NotificationListenerService() {
             updateMediaState()
         }
         override fun onMetadataChanged(metadata: MediaMetadata?) {
+            cachedMetadata = metadata
             updateMediaState()
         }
         override fun onSessionDestroyed() {
             handler.post { 
-                releaseController()
+                // Don't release, persist instead
+                persistMediaState()
                 // Do not nullify source immediately, wait for scan
                 findActiveMedia()
             }
         }
     }
 
-    private val copyReceiver = object : android.content.BroadcastReceiver() {
+    private val actionReceiver = object : android.content.BroadcastReceiver() {
         override fun onReceive(context: android.content.Context, intent: android.content.Intent?) {
-            if (intent?.action == ACTION_COPY_OTP) {
-                val code = intent.getStringExtra(EXTRA_OTP_CODE) ?: return
-                val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                val clip = android.content.ClipData.newPlainText("OTP", code)
-                clipboard.setPrimaryClip(clip)
-            } else if (intent?.action == NotificationPublisher.ACTION_NOTIFICATION_DISMISSED) {
-                // User swiped it away. Clear all states.
-                LiveActivityManager.updateMediaState(null)
-                LiveActivityManager.clearOtpState()
-                // For downloads, we might want to keep tracking internally, but stop showing the chip.
-                // Resetting download state is safest to stop reposting.
-                val pkg = LiveActivityManager.getBestState()?.sourcePackage
-                if (pkg != null) LiveActivityManager.clearDownloadState(pkg)
+            val action = intent?.action ?: return
+            
+            // Delegate to handlers
+            if (otpHandler.handleAction(context, action, intent)) return
+            if (torchHandler.handleAction(context, action, intent)) return
+            
+            // Handle remaining actions
+            if (action == ACTION_RESUME_MEDIA) {
+                 val pkg = intent.getStringExtra(EXTRA_PACKAGE_NAME) ?: return
+                 // Attempt to resume playback via Media Button Intent
+                 val keyIntent = android.content.Intent(android.content.Intent.ACTION_MEDIA_BUTTON).apply {
+                     setPackage(pkg)
+                     putExtra(android.content.Intent.EXTRA_KEY_EVENT, android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_MEDIA_PLAY))
+                 }
+                 context.sendBroadcast(keyIntent)
+                 
+                 // Also try key up immediately
+                 val keyUpIntent = android.content.Intent(android.content.Intent.ACTION_MEDIA_BUTTON).apply {
+                     setPackage(pkg)
+                     putExtra(android.content.Intent.EXTRA_KEY_EVENT, android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_MEDIA_PLAY))
+                 }
+                 context.sendBroadcast(keyUpIntent)
+            } else if (action == NotificationPublisher.ACTION_NOTIFICATION_DISMISSED) {
+                // User swiped it away.
+                // CRITICAL FIX: If media is playing, DO NOT release controller. Just force a refresh.
+                val isPlaying = activeController?.playbackState?.state == PlaybackState.STATE_PLAYING
                 
-                // Clear the actual notification just in case
-                publisher.cancelNotification()
+                if (!isPlaying) {
+                     // Manual Dismissal by user -> Really clear it
+                     otpHandler.clearState()
+                     fullyReleaseController()
+                } else {
+                     // Just force a refresh
+                }
                 lastPublishedState = null
             }
         }
@@ -92,13 +131,19 @@ class MediaNotificationListener : NotificationListenerService() {
         super.onCreate()
         publisher = NotificationPublisher(this)
 
+        // Initialize Handlers
+        torchHandler = TorchHandler(this, handler) { updateLiveActivity() }
+        otpHandler = OtpHandler(this) { updateLiveActivity() }
+        downloadHandler = DownloadHandler(this) { updateLiveActivity() }
         
         // Register Receivers
         val filter = android.content.IntentFilter().apply {
-            addAction(ACTION_COPY_OTP)
+            addAction(OtpHandler.ACTION_COPY_OTP)
+            addAction(TorchHandler.ACTION_TURN_OFF_TORCH)
+            addAction(ACTION_RESUME_MEDIA)
             addAction(NotificationPublisher.ACTION_NOTIFICATION_DISMISSED)
         }
-        registerReceiver(copyReceiver, filter, android.content.Context.RECEIVER_NOT_EXPORTED)
+        registerReceiver(actionReceiver, filter, android.content.Context.RECEIVER_NOT_EXPORTED)
         
         // Start the eternal tick loop
         serviceScope.launch {
@@ -111,7 +156,10 @@ class MediaNotificationListener : NotificationListenerService() {
 
     override fun onDestroy() {
         serviceScope.cancel()
-        unregisterReceiver(copyReceiver)
+        unregisterReceiver(actionReceiver)
+        torchHandler.cleanup()
+        otpHandler.cleanup()
+        downloadHandler.cleanup()
         releaseController()
         publisher.cancelNotification()
         super.onDestroy()
@@ -128,72 +176,135 @@ class MediaNotificationListener : NotificationListenerService() {
              // 1. Update Media State (in case position changed naturally)
             if (activeController != null) updateMediaState()
             
-            // 2. Get Best State
+            // 2. Check handlers by priority (Torch > OTP > Download > Media)
+            val torchState = torchHandler.getCurrentState()
+            if (torchState != null) {
+                publishState(torchState)
+                return@launch
+            }
+            
+            val otpState = otpHandler.getCurrentState()
+            if (otpState != null) {
+                publishState(otpState)
+                return@launch
+            }
+            
+            val downloadState = downloadHandler.getCurrentState()
+            if (downloadState != null) {
+                publishState(downloadState)
+                return@launch
+            }
+            
+            // 3. Fall back to legacy LiveActivityManager for Media only
             val state = LiveActivityManager.getBestState()
             
-            // Optimization: Skip update if state is identical
-            if (state == lastPublishedState) return@launch
-            lastPublishedState = state // Update cache
-            
-            // 3. Publish
-            if (state != null) {
-                
-                // Logic to inject specific actions
-                var finalActions = state.actions
-                if (state.isOtp) {
-                     finalActions = listOf(createCopyAction(state.artist)) // artist holds the code
-                }
-    
-                publisher.updateNotification(
-                    notificationId = NotificationPublisher.BASE_NOTIFICATION_ID, 
-                    title = state.title,
-                    artist = state.artist,
-                    bitmap = state.bitmap,
-                    token = state.token,
-                    isPlaying = state.isPlaying,
-                    actions = finalActions,
-                    sourcePackage = state.sourcePackage,
-                    launchIntent = activeNotifications?.find { it.packageName == state.sourcePackage }?.notification?.contentIntent,
-                    duration = state.duration,
-                    position = state.position,
-                    overrideChipText = state.chipText,
-                    skipMediaFilter = state.isOtp || state.isDownload,
-                    isOtp = state.isOtp,
-                    isDownload = state.isDownload
-                )
-            } else {
-    
-                if (lastPublishedState != null) {
-                    // Only cancel if we were previously showing something
+            // If nothing is active, cancel the notification
+            if (state == null) {
+                if (isNotificationShowing) {
                     publisher.cancelNotification()
+                    isNotificationShowing = false
                     lastPublishedState = null
                 }
+                return@launch
             }
+            
+            // Optimization: Skip update if title & artist are identical
+            val shouldSkip = lastPublishedState != null &&
+                state.title == lastPublishedState?.title &&
+                state.artist == lastPublishedState?.artist &&
+                state.isPlaying == lastPublishedState?.isPlaying
+            
+            if (shouldSkip) return@launch
+            lastPublishedState = state
+            
+            // 4. Publish Media state
+            publisher.updateNotification(
+                notificationId = NotificationPublisher.BASE_NOTIFICATION_ID, 
+                title = state.title,
+                artist = state.artist,
+                bitmap = state.bitmap,
+                token = state.token,
+                isPlaying = state.isPlaying,
+                actions = state.actions,
+                sourcePackage = state.sourcePackage,
+                launchIntent = activeNotifications?.find { it.packageName == state.sourcePackage }?.notification?.contentIntent,
+                duration = state.duration,
+                position = state.position,
+                overrideChipText = state.chipText,
+                skipMediaFilter = false,
+                isOtp = false,
+                isDownload = false,
+                isTorch = false
+            )
+            isNotificationShowing = true
         }
     }
     
-    private fun createCopyAction(code: String): Notification.Action {
-        val intent = android.content.Intent(ACTION_COPY_OTP).apply {
-            putExtra(EXTRA_OTP_CODE, code)
-            setPackage(packageName)
+    private fun publishState(state: LiveActivityState) {
+        publisher.updateNotification(
+            notificationId = NotificationPublisher.BASE_NOTIFICATION_ID,
+            title = state.title,
+            artist = state.subtitle,
+            bitmap = state.icon,
+            token = state.mediaToken,
+            isPlaying = state.isPlaying,
+            actions = state.actions,
+            sourcePackage = state.sourcePackage,
+            launchIntent = null,
+            duration = state.duration,
+            position = state.position,
+            overrideChipText = state.chipText,
+            skipMediaFilter = true,
+            isOtp = state.type == LiveActivityType.OTP,
+            isDownload = state.type == LiveActivityType.DOWNLOAD,
+            isTorch = state.type == LiveActivityType.TORCH
+        )
+        isNotificationShowing = true
+        lastPublishedState = null // Reset legacy cache since we're using new state
+    }
+    
+
+
+
+
+    private fun createResumeAction(packageName: String): Notification.Action {
+        val intent = android.content.Intent(ACTION_RESUME_MEDIA).apply {
+            putExtra(EXTRA_PACKAGE_NAME, packageName)
+            setPackage(this@MediaNotificationListener.packageName)
         }
         val pendingIntent = android.app.PendingIntent.getBroadcast(
-            this, code.hashCode(), intent, 
+            this, packageName.hashCode(), intent, 
             android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
         )
-        
-        // Using a standard icon, usually would want a dedicated copy icon
         return Notification.Action.Builder(
-            android.R.drawable.ic_menu_save, 
-            "Copy", 
+            android.R.drawable.ic_media_play, 
+            "Play", 
             pendingIntent
         ).build()
     }
 
     private fun updateMediaState() {
         val controller = activeController
+        
+        // Offline / Resumable Mode
         if (controller == null) {
-            LiveActivityManager.updateMediaState(null)
+            if (activeSourcePackage != null) { // We are in persisted state
+                 LiveActivityManager.updateMediaState(
+                    LiveActivityManager.MediaState(
+                        title = cachedTitle,
+                        artist = cachedArtist,
+                        art = cachedLargeIcon,
+                        token = null,
+                        isPlaying = false,
+                        actions = cachedActions, // Use the synthesized ones
+                        sourcePackage = activeSourcePackage ?: "",
+                        duration = cachedDuration,
+                        position = 0L
+                    )
+                )
+            } else {
+                 LiveActivityManager.updateMediaState(null)
+            }
             return
         }
 
@@ -207,18 +318,27 @@ class MediaNotificationListener : NotificationListenerService() {
             ?: "Audio"
             
         // Filter out junk
-        if (title.isNullOrBlank()) return
+        if (title.isNullOrBlank()) {
+             // Fix Zombie: If metadata is empty, clear the state instead of ignoring it
+             fullyReleaseController()
+             return
+        }
+        
+        cachedTitle = title
+        cachedArtist = metadata.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: ""
+        cachedDuration = metadata.getLong(MediaMetadata.METADATA_KEY_DURATION)
+        cachedMetadata = metadata
 
         LiveActivityManager.updateMediaState(
             LiveActivityManager.MediaState(
-                title = title,
-                artist = metadata.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: "",
+                title = cachedTitle,
+                artist = cachedArtist,
                 art = metadata.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART) ?: cachedLargeIcon,
                 token = activeToken,
                 isPlaying = state?.state == PlaybackState.STATE_PLAYING || state?.state == PlaybackState.STATE_BUFFERING,
                 actions = cachedActions,
                 sourcePackage = activeSourcePackage ?: "",
-                duration = metadata.getLong(MediaMetadata.METADATA_KEY_DURATION),
+                duration = cachedDuration,
                 position = state?.position ?: 0L
             )
         )
@@ -227,84 +347,42 @@ class MediaNotificationListener : NotificationListenerService() {
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         if (sbn.packageName == packageName) return
 
-        // 1. Check for OTP
-        checkForOtp(sbn)
+        // 1. Check for OTP (delegated to handler)
+        otpHandler.onNotificationPosted(sbn)
 
-        // 2. Check for Downloads
-        checkForDownload(sbn)
+        // 2. Check for Downloads (delegated to handler)
+        downloadHandler.onNotificationPosted(sbn)
 
         // 3. Check for Media
         if (isMediaNotification(sbn)) {
              handleMediaNotification(sbn)
         } else if (sbn.packageName == activeSourcePackage && sbn.id == activeSourceNotificationId) {
              // Active source updated specifically the media notification to a non-media state
-             releaseController()
+             fullyReleaseController()
              activeSourcePackage = null
              activeSourceNotificationId = null
              handler.postDelayed({ findActiveMedia() }, 300L)
         }
     }
     
-    private fun checkForOtp(sbn: StatusBarNotification) {
-        val extras = sbn.notification.extras
-        // Combine Title, Text and BigText for full context
-        // Optimized: Avoid allocations (List, Filter, Join)
-        val sb = StringBuilder()
-        val title = extras.getCharSequence(Notification.EXTRA_TITLE)
-        if (!title.isNullOrEmpty()) sb.append(title).append(" ")
-        
-        val textContent = extras.getCharSequence(Notification.EXTRA_TEXT)
-        if (!textContent.isNullOrEmpty()) sb.append(textContent).append(" ")
-        
-        val bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)
-        if (!bigText.isNullOrEmpty()) sb.append(bigText)
-        
-        val text = sb.toString()
-        
-        OtpExtractor.extract(text)?.let { code ->
-            LiveActivityManager.updateOtpState(code, sbn.packageName)
-            // Force immediate update (runs via coroutine inside)
-            updateLiveActivity()
-        }
-    }
-    
-    private fun checkForDownload(sbn: StatusBarNotification) {
-        val extras = sbn.notification.extras
-        if (extras.containsKey(Notification.EXTRA_PROGRESS)) {
-            val max = extras.getInt(Notification.EXTRA_PROGRESS_MAX)
-            val indeterminate = extras.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE)
-            
-            if (max > 0 && !indeterminate) {
-                // Ignore if it looks like a media music player track progress (usually handled by media session)
-                if (!isMediaNotification(sbn)) {
-                    val current = extras.getInt(Notification.EXTRA_PROGRESS)
-                    val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: "Downloading..."
-                    // Optimized: Avoid copying array to list if possible, or use lightweight wrapper
-                    val actionsArray = sbn.notification.actions
-                    val actions = if (actionsArray != null) java.util.Arrays.asList(*actionsArray) else emptyList()
-                    LiveActivityManager.updateDownloadState(sbn.packageName, title, current, max, actions, sbn.id)
-                    return
-                }
-            }
-        }
-        // If we reach here, it's not a valid download update.
-        // If this specific notification was the active download, clear it.
-        LiveActivityManager.tryClearDownloadState(sbn.packageName, sbn.id)
-    }
-    
-    private fun checkForDownloadRemoval(sbn: StatusBarNotification) {
-        LiveActivityManager.clearDownloadState(sbn.packageName)
-    }
+
+
 
     private fun handleMediaNotification(sbn: StatusBarNotification) {
         val token = getToken(sbn) ?: return
         
         when {
-            sbn.packageName == activeSourcePackage -> {
+            // Same package AND we have an active controller - just update metadata
+            sbn.packageName == activeSourcePackage && activeController != null -> {
                 cachedActions = sbn.notification.actions?.toList() ?: emptyList()
                 updateLargeIcon(sbn)
                 updateMediaState()
             }
+            // Same package but controller is null (resuming from persisted state) - re-attach
+            sbn.packageName == activeSourcePackage && activeController == null -> {
+                switchToSource(sbn, token)
+            }
+            // Different package or no active source - switch if playing
             activeSourcePackage == null || isNewSourcePlaying(token) -> {
                 switchToSource(sbn, token)
             }
@@ -351,34 +429,95 @@ class MediaNotificationListener : NotificationListenerService() {
         updateLiveActivity()
     }
     
-    private fun releaseController() {
+    private fun persistMediaState() {
+        val pkg = activeSourcePackage ?: return
+        
+        // Synthesize actions: Replace Pause with Resume, or just Prepend Resume
+        // Simple heuristic: If we don't have a Play action, add our component
+        val currentActions = cachedActions.toMutableList()
+        val hasPlay = currentActions.any { it.title?.toString()?.contains("Play", ignoreCase = true) == true }
+        
+        if (!hasPlay) {
+            // Likely was "Pause" before. Let's put "Play" at the front or replace "Pause"
+            val pauseIndex = currentActions.indexOfFirst { it.title?.toString()?.contains("Pause", ignoreCase = true) == true }
+            val resumeAction = createResumeAction(pkg)
+            
+            if (pauseIndex != -1) {
+                currentActions[pauseIndex] = resumeAction
+            } else {
+                currentActions.add(0, resumeAction)
+            }
+        }
+        cachedActions = currentActions
+        
+        // Release controller but KEEP activeSourcePackage
         runCatching { activeController?.unregisterCallback(controllerCallback) }
         activeController = null
         activeToken = null
+        // activeSourcePackage remains!
+        // activeSourceNotificationId remains (or ignored)
+        
+        updateMediaState()
+    }
+
+    private fun fullyReleaseController() {
+        runCatching { activeController?.unregisterCallback(controllerCallback) }
+        activeController = null
+        activeToken = null
+        activeSourcePackage = null
+        activeSourceNotificationId = null
+        cachedMetadata = null
         LiveActivityManager.updateMediaState(null)
+        
+        // Also clear handlers if needed (they manage their own state now)
+        otpHandler.clearState()
+        downloadHandler.clearState()
+        publisher.cancelNotification()
+    }
+    
+    // Replaces the old releaseController with fullyReleaseController OR persist logic depending on context
+    // But since releaseController was used in many places, let's redefine it as fullyRelease
+    private fun releaseController() {
+        // Default behavior for "releaseController" calls in the code was "Stop Tracking".
+        // But for "Removed" logic, we now want "Persist".
+        // So we should update call sites.
+        fullyReleaseController()
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         // 1. Check if User dismissed OUR notification
+        // 1. Check if User dismissed OUR notification
         if (sbn.packageName == packageName && sbn.id == NotificationPublisher.BASE_NOTIFICATION_ID) {
-            LiveActivityManager.clearOtpState()
-            // We might want to clear downloads too? The user verified "otp notification".
-            // Let's assume swipe means "Stop showing me this", so clearing OTP is safe. 
-            // If download is running, it might pop back up? LiveActivityManager prioritizes OTP. 
-            // If we clear OTP, and download is active, it might fall back to Download. 
-            // If user swiped, they likely want the slot clear. But standard behavior is just removing the current top.
+            
+            val isPlaying = activeController?.playbackState?.state == PlaybackState.STATE_PLAYING
+            if (!isPlaying) {
+                 fullyReleaseController()
+            }
+            // Force state clear to trigger regeneration if playing
+            lastPublishedState = null
         }
 
-        checkForDownloadRemoval(sbn)
+        // Delegate to download handler
+        downloadHandler.onNotificationRemoved(sbn)
         
         if (sbn.packageName == activeSourcePackage) {
-            // Only release if the removed notification IS the media notification
-            // Or if we don't track ID yet (shouldn't happen)
-            if (activeSourceNotificationId == null || sbn.id == activeSourceNotificationId) {
-                releaseController()
-                activeSourcePackage = null
-                activeSourceNotificationId = null
-                handler.postDelayed({ findActiveMedia() }, 300L)
+            // Robust Check: Instead of relying on ID or specific SBN properties of the removed notification
+            // (which might be incomplete), check if the OS still reports ANY media notification for this package.
+            // If the app was force-closed or swiped, this should return false.
+            val stillHasMedia = try {
+                activeNotifications?.any { 
+                    it.packageName == activeSourcePackage && isMediaNotification(it) 
+                } == true
+            } catch (e: Exception) {
+                false // If we can't check, assume it's gone to prevent sticking
+            }
+
+            if (!stillHasMedia) {
+                // Was: releaseController() -> NOW: persistState
+                persistMediaState()
+                
+                // Do NOT nullify package, we want to remember it
+                handler.postDelayed({ findActiveMedia() }, 500L)
             }
         }
     }

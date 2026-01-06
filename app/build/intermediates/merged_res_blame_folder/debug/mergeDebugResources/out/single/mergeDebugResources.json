@@ -1,58 +1,54 @@
 [
     {
-        "merged": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-debug-44:\\drawable_ic_notification_mirror.xml.flat",
-        "source": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-main-46:\\drawable\\ic_notification_mirror.xml"
+        "merged": "com.example.livemedia.app-debug-44:/layout_notification_live_activity.xml.flat",
+        "source": "com.example.livemedia.app-main-46:/layout/notification_live_activity.xml"
     },
     {
-        "merged": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-debug-44:\\mipmap-anydpi-v26_ic_launcher.xml.flat",
-        "source": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-main-46:\\mipmap-anydpi-v26\\ic_launcher.xml"
+        "merged": "com.example.livemedia.app-debug-44:/drawable_progress_bar_funky.xml.flat",
+        "source": "com.example.livemedia.app-main-46:/drawable/progress_bar_funky.xml"
     },
     {
-        "merged": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-debug-44:\\drawable_ic_launcher_foreground.xml.flat",
-        "source": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-main-46:\\drawable\\ic_launcher_foreground.xml"
+        "merged": "com.example.livemedia.app-debug-44:/drawable_ic_launcher_monochrome.xml.flat",
+        "source": "com.example.livemedia.app-main-46:/drawable/ic_launcher_monochrome.xml"
     },
     {
-        "merged": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-debug-44:\\drawable_ic_audio_wave.xml.flat",
-        "source": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-main-46:\\drawable\\ic_audio_wave.xml"
+        "merged": "com.example.livemedia.app-debug-44:/drawable_ic_audio_wave.xml.flat",
+        "source": "com.example.livemedia.app-main-46:/drawable/ic_audio_wave.xml"
     },
     {
-        "merged": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-debug-44:\\mipmap-hdpi_ic_launcher.xml.flat",
-        "source": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-main-46:\\mipmap-hdpi\\ic_launcher.xml"
+        "merged": "com.example.livemedia.app-debug-44:/xml_backup_rules.xml.flat",
+        "source": "com.example.livemedia.app-main-46:/xml/backup_rules.xml"
     },
     {
-        "merged": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-debug-44:\\drawable_ic_pause.xml.flat",
-        "source": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-main-46:\\drawable\\ic_pause.xml"
+        "merged": "com.example.livemedia.app-debug-44:/mipmap-anydpi-v26_ic_launcher_round.xml.flat",
+        "source": "com.example.livemedia.app-main-46:/mipmap-anydpi-v26/ic_launcher_round.xml"
     },
     {
-        "merged": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-debug-44:\\xml_backup_rules.xml.flat",
-        "source": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-main-46:\\xml\\backup_rules.xml"
+        "merged": "com.example.livemedia.app-debug-44:/drawable_ic_launcher_foreground.xml.flat",
+        "source": "com.example.livemedia.app-main-46:/drawable/ic_launcher_foreground.xml"
     },
     {
-        "merged": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-debug-44:\\layout_notification_live_activity.xml.flat",
-        "source": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-main-46:\\layout\\notification_live_activity.xml"
+        "merged": "com.example.livemedia.app-debug-44:/xml_data_extraction_rules.xml.flat",
+        "source": "com.example.livemedia.app-main-46:/xml/data_extraction_rules.xml"
     },
     {
-        "merged": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-debug-44:\\mipmap-hdpi_ic_launcher_round.xml.flat",
-        "source": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-main-46:\\mipmap-hdpi\\ic_launcher_round.xml"
+        "merged": "com.example.livemedia.app-debug-44:/mipmap-hdpi_ic_launcher_round.xml.flat",
+        "source": "com.example.livemedia.app-main-46:/mipmap-hdpi/ic_launcher_round.xml"
     },
     {
-        "merged": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-debug-44:\\mipmap-anydpi-v26_ic_launcher_round.xml.flat",
-        "source": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-main-46:\\mipmap-anydpi-v26\\ic_launcher_round.xml"
+        "merged": "com.example.livemedia.app-debug-44:/drawable_ic_pause.xml.flat",
+        "source": "com.example.livemedia.app-main-46:/drawable/ic_pause.xml"
     },
     {
-        "merged": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-debug-44:\\xml_data_extraction_rules.xml.flat",
-        "source": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-main-46:\\xml\\data_extraction_rules.xml"
+        "merged": "com.example.livemedia.app-debug-44:/mipmap-hdpi_ic_launcher.xml.flat",
+        "source": "com.example.livemedia.app-main-46:/mipmap-hdpi/ic_launcher.xml"
     },
     {
-        "merged": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-debug-44:\\drawable_progress_bar_funky.xml.flat",
-        "source": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-main-46:\\drawable\\progress_bar_funky.xml"
+        "merged": "com.example.livemedia.app-debug-44:/drawable_progress_bar_bg.xml.flat",
+        "source": "com.example.livemedia.app-main-46:/drawable/progress_bar_bg.xml"
     },
     {
-        "merged": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-debug-44:\\drawable_ic_launcher_monochrome.xml.flat",
-        "source": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-main-46:\\drawable\\ic_launcher_monochrome.xml"
-    },
-    {
-        "merged": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-debug-44:\\drawable_progress_bar_bg.xml.flat",
-        "source": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-main-46:\\drawable\\progress_bar_bg.xml"
+        "merged": "com.example.livemedia.app-debug-44:/mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "com.example.livemedia.app-main-46:/mipmap-anydpi-v26/ic_launcher.xml"
     }
 ]
