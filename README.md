@@ -2,7 +2,10 @@
 
 **Your notifications, reimagined.**
 
-<div align="center">  
+<div align="center">
+  <br/>
+  <br/>
+  
   [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.0-purple.svg?style=flat&logo=kotlin)](https://kotlinlang.org)
   [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-M3-green.svg?style=flat&logo=android)](https://developer.android.com/jetpack/compose)
   [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
