@@ -1,5 +1,6 @@
 package com.example.livemedia
 
+import android.util.Log
 import java.util.regex.Pattern
 
 /**
@@ -66,33 +67,55 @@ object OtpExtractor {
     fun extract(text: String): String? {
         try {
             val cleanText = text.trim()
+            Log.d("OtpExtractor", "Attempting extraction from: $cleanText")
             
             // Stage 0: Reverse Anchored (New High Confidence)
-            findMatch(STAGE_0_REVERSE_ANCHORED, cleanText)?.let { return it }
+            findMatch(STAGE_0_REVERSE_ANCHORED, cleanText, "Stage0_ReverseAnchored")?.let { 
+                Log.d("OtpExtractor", "Stage 0 matched: $it")
+                return it 
+            }
 
             // Stage 1: Keyword Anchored (High Confidence)
-            findMatch(STAGE_1_KEYWORD_ANCHORED, cleanText)?.let { return it }
+            findMatch(STAGE_1_KEYWORD_ANCHORED, cleanText, "Stage1_KeywordAnchored")?.let { 
+                Log.d("OtpExtractor", "Stage 1 matched: $it")
+                return it 
+            }
     
             // Stage 4: Prefix (High Confidence specific form)
-            findMatch(STAGE_4_PREFIX, cleanText)?.let { return it }
+            findMatch(STAGE_4_PREFIX, cleanText, "Stage4_Prefix")?.let { 
+                Log.d("OtpExtractor", "Stage 4 matched: $it")
+                return it 
+            }
     
             // Stage 2: Strict Numeric (Medium Confidence)
-            findMatch(STAGE_2_STRICT_NUMERIC, cleanText)?.let { return it }
+            findMatch(STAGE_2_STRICT_NUMERIC, cleanText, "Stage2_StrictNumeric")?.let { 
+                Log.d("OtpExtractor", "Stage 2 matched: $it")
+                return it 
+            }
     
             // Stage 3: Broad (Low Confidence - Use only if we have context elsewhere or desperate)
             // Only run Stage 3 if the text actually contains one of the mandatory keywords
             // (User's context requirement)
             if (containsKeyword(cleanText)) {
-                findMatch(STAGE_3_BROAD, cleanText)?.let { return it }
+                Log.d("OtpExtractor", "Has keywords, trying Stage 3")
+                findMatch(STAGE_3_BROAD, cleanText, "Stage3_Broad")?.let { 
+                    Log.d("OtpExtractor", "Stage 3 matched: $it")
+                    return it 
+                }
+            } else {
+                Log.d("OtpExtractor", "No keywords found, skipping Stage 3")
             }
+            
+            Log.d("OtpExtractor", "No OTP found in text")
         } catch (e: Exception) {
+            Log.e("OtpExtractor", "Error extracting OTP", e)
             e.printStackTrace()
         }
 
         return null
     }
 
-    private fun findMatch(pattern: Pattern, text: String): String? {
+    private fun findMatch(pattern: Pattern, text: String, stageName: String = ""): String? {
         val matcher = pattern.matcher(text)
         while (matcher.find()) {
             // Some patterns have capturing groups, others match the whole group 1/0
@@ -100,8 +123,13 @@ object OtpExtractor {
             val fullMatch = matcher.group(0) ?: ""
             val start = matcher.start()
             
+            Log.d("OtpExtractor", "$stageName found candidate: '$candidate' (full: '$fullMatch')")
+            
             if (candidate != null && passesPostFilters(candidate, text, start, fullMatch)) {
+                Log.d("OtpExtractor", "$stageName candidate passed filters: $candidate")
                 return cleanCandidate(candidate)
+            } else {
+                Log.d("OtpExtractor", "$stageName candidate rejected by filters")
             }
         }
         return null

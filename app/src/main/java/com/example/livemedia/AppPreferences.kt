@@ -49,7 +49,7 @@ class AppPreferences(context: Context) {
         
     // VISIBILITY SETTINGS
     var showOnLockscreen: Boolean
-        get() = prefs.getBoolean("visibility_lockscreen", false)
+        get() = prefs.getBoolean("visibility_lockscreen", true)
         set(value) = prefs.edit().putBoolean("visibility_lockscreen", value).apply()
 
     // MEDIA DETAILING SETTINGS (From Screenshot)

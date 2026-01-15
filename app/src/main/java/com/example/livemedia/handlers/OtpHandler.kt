@@ -109,26 +109,102 @@ class OtpHandler(
     }
     
     private fun checkForOtp(sbn: StatusBarNotification) {
-        val extras = sbn.notification.extras
+        android.util.Log.d("OtpHandler", "=== Checking notification from: ${sbn.packageName} ===")
         
-        // Combine Title, Text and BigText for full context
-        val sb = StringBuilder()
-        val title = extras.getCharSequence(Notification.EXTRA_TITLE)
-        if (!title.isNullOrEmpty()) sb.append(title).append(" ")
+        val notification = sbn.notification
+        val extras = notification.extras
         
-        val textContent = extras.getCharSequence(Notification.EXTRA_TEXT)
-        if (!textContent.isNullOrEmpty()) sb.append(textContent).append(" ")
+        // Log all available extras for debugging
+        android.util.Log.d("OtpHandler", "Available extras: ${extras.keySet().joinToString()}")
         
-        val bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)
-        if (!bigText.isNullOrEmpty()) sb.append(bigText)
+        // Build comprehensive text from ALL possible sources
+        val textParts = mutableListOf<String>()
         
-        val text = sb.toString()
+        // 1. Standard notification extras
+        extras.getCharSequence(android.app.Notification.EXTRA_TITLE)?.let {
+            textParts.add(it.toString())
+            android.util.Log.d("OtpHandler", "EXTRA_TITLE: $it")
+        }
         
-        OtpExtractor.extract(text)?.let { code ->
-            otpCode = code
+        extras.getCharSequence(android.app.Notification.EXTRA_TEXT)?.let {
+            textParts.add(it.toString())
+            android.util.Log.d("OtpHandler", "EXTRA_TEXT: $it")
+        }
+        
+        extras.getCharSequence(android.app.Notification.EXTRA_BIG_TEXT)?.let {
+            textParts.add(it.toString())
+            android.util.Log.d("OtpHandler", "EXTRA_BIG_TEXT: $it")
+        }
+        
+        extras.getCharSequence(android.app.Notification.EXTRA_SUB_TEXT)?.let {
+            textParts.add(it.toString())
+            android.util.Log.d("OtpHandler", "EXTRA_SUB_TEXT: $it")
+        }
+        
+        extras.getCharSequence(android.app.Notification.EXTRA_INFO_TEXT)?.let {
+            textParts.add(it.toString())
+            android.util.Log.d("OtpHandler", "EXTRA_INFO_TEXT: $it")
+        }
+        
+        extras.getCharSequence(android.app.Notification.EXTRA_SUMMARY_TEXT)?.let {
+            textParts.add(it.toString())
+            android.util.Log.d("OtpHandler", "EXTRA_SUMMARY_TEXT: $it")
+        }
+        
+        // 2. MessagingStyle (Google Messages, WhatsApp, etc.)
+        @Suppress("DEPRECATION")
+        val messages = extras.getParcelableArray(android.app.Notification.EXTRA_MESSAGES)
+        if (messages != null) {
+            android.util.Log.d("OtpHandler", "Found EXTRA_MESSAGES with ${messages.size} messages")
+            for (msg in messages) {
+                if (msg is android.os.Bundle) {
+                    msg.getCharSequence("text")?.let {
+                        textParts.add(it.toString())
+                        android.util.Log.d("OtpHandler", "Message text: $it")
+                    }
+                }
+            }
+        }
+        
+        // 3. InboxStyle text lines
+        val textLines = extras.getCharSequenceArray(android.app.Notification.EXTRA_TEXT_LINES)
+        if (textLines != null) {
+            android.util.Log.d("OtpHandler", "Found EXTRA_TEXT_LINES with ${textLines.size} lines")
+            for (line in textLines) {
+                line?.let {
+                    textParts.add(it.toString())
+                    android.util.Log.d("OtpHandler", "Text line: $it")
+                }
+            }
+        }
+        
+        // 4. Ticker text (legacy but sometimes contains OTP)
+        notification.tickerText?.let {
+            textParts.add(it.toString())
+            android.util.Log.d("OtpHandler", "Ticker: $it")
+        }
+        
+        // Combine all text
+        val combinedText = textParts.joinToString(" ")
+        android.util.Log.d("OtpHandler", "Combined text for extraction: $combinedText")
+        
+        if (combinedText.isBlank()) {
+            android.util.Log.w("OtpHandler", "No text found in notification!")
+            return
+        }
+        
+        // Try to extract OTP
+        val extractedCode = OtpExtractor.extract(combinedText)
+        android.util.Log.d("OtpHandler", "Extracted OTP result: $extractedCode")
+        
+        if (extractedCode != null) {
+            otpCode = extractedCode
             otpExpiryTime = SystemClock.elapsedRealtime() + OTP_EXPIRY_MS
             sourcePackage = sbn.packageName
+            android.util.Log.i("OtpHandler", "✓ OTP detected and set: $otpCode")
             onStateChanged()
+        } else {
+            android.util.Log.d("OtpHandler", "✗ No OTP found in this notification")
         }
     }
     
