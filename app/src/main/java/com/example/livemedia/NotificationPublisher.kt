@@ -57,7 +57,8 @@ class NotificationPublisher(private val context: Context) {
         skipMediaFilter: Boolean = false,
         isOtp: Boolean = false,
         isDownload: Boolean = false,
-        isTorch: Boolean = false
+        isTorch: Boolean = false,
+        smallIconResId: Int? = null
     ): Int {
         val pendingIntent = launchIntent ?: createLaunchIntent(sourcePackage)
         val chipText = overrideChipText ?: createChipText(title)
@@ -66,9 +67,9 @@ class NotificationPublisher(private val context: Context) {
         val finalActions = if (skipMediaFilter) actions else filterMediaActions(actions)
         
         val notification = if (Build.VERSION.SDK_INT >= 36) {
-            buildAndroid16Notification(title, artist, bitmap, chipText, pendingIntent, finalActions, duration, position, isOtp, isDownload, isTorch)
+            buildAndroid16Notification(title, artist, bitmap, chipText, pendingIntent, finalActions, duration, position, isOtp, isDownload, isTorch, smallIconResId)
         } else {
-            buildLegacyNotification(title, artist, bitmap, pendingIntent, finalActions, duration, position, isOtp, isDownload, isTorch)
+            buildLegacyNotification(title, artist, bitmap, pendingIntent, finalActions, duration, position, isOtp, isDownload, isTorch, smallIconResId)
         }
 
         if (currentNotificationId != notificationId) {
@@ -125,7 +126,8 @@ class NotificationPublisher(private val context: Context) {
         duration: Long, position: Long,
         isOtp: Boolean,
         isDownload: Boolean,
-        isTorch: Boolean
+        isTorch: Boolean,
+        smallIconResId: Int?
     ): Notification {
         val max = if (duration > 0) (duration / 1000).toInt() else 100
         val progress = if (duration > 0) (position / 1000).toInt() else 0
@@ -141,6 +143,7 @@ class NotificationPublisher(private val context: Context) {
                  }
             }
             isTorch -> android.R.drawable.ic_lock_idle_charging // Lightning bolt for Torch
+            smallIconResId != null -> smallIconResId
             else -> android.R.drawable.ic_media_play
         }
         
@@ -187,7 +190,8 @@ class NotificationPublisher(private val context: Context) {
         duration: Long, position: Long,
         isOtp: Boolean,
         isDownload: Boolean,
-        isTorch: Boolean
+        isTorch: Boolean,
+        smallIconResId: Int?
     ): Notification {
         val max = if (duration > 0) (duration / 1000).toInt() else 100
         val progress = if (duration > 0) (position / 1000).toInt() else 0
@@ -203,6 +207,7 @@ class NotificationPublisher(private val context: Context) {
                  }
             }
             isTorch -> android.R.drawable.ic_lock_idle_charging
+            smallIconResId != null -> smallIconResId
             else -> android.R.drawable.ic_media_play
         }
 

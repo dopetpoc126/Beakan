@@ -1,12 +1,30 @@
 R_DEF: Internal format may change without notice
 local
 color ic_launcher_background
+drawable amazon_music
+drawable apple_music
+drawable deezer
 drawable ic_audio_wave
 drawable ic_launcher_foreground
 drawable ic_launcher_monochrome
 drawable ic_pause
+drawable netflix
+drawable next_svgrepo_com
+drawable notebook_lm
+drawable outline_artist_24
+drawable play_pause_svgrepo_com
+drawable previous_svgrepo_com
 drawable progress_bar_bg
 drawable progress_bar_funky
+drawable qobuz_com
+drawable soundcloud
+drawable spotify
+drawable telegram
+drawable tidal
+drawable twitch
+drawable usb_audio_player_pro
+drawable youtube
+drawable youtube_music
 id action_next
 id action_play_pause
 id action_prev

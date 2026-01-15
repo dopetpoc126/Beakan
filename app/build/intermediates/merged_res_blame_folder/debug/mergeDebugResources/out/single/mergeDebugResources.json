@@ -1,54 +1,126 @@
 [
     {
-        "merged": "com.example.livemedia.app-debug-44:/layout_notification_live_activity.xml.flat",
-        "source": "com.example.livemedia.app-main-46:/layout/notification_live_activity.xml"
+        "merged": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-debug-44:\\mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-main-46:\\mipmap-anydpi-v26\\ic_launcher.xml"
     },
     {
-        "merged": "com.example.livemedia.app-debug-44:/drawable_progress_bar_funky.xml.flat",
-        "source": "com.example.livemedia.app-main-46:/drawable/progress_bar_funky.xml"
+        "merged": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-debug-44:\\drawable_ic_audio_wave.xml.flat",
+        "source": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-main-46:\\drawable\\ic_audio_wave.xml"
     },
     {
-        "merged": "com.example.livemedia.app-debug-44:/drawable_ic_launcher_monochrome.xml.flat",
-        "source": "com.example.livemedia.app-main-46:/drawable/ic_launcher_monochrome.xml"
+        "merged": "com.example.livemedia.app-debug-44:/drawable_youtube.xml.flat",
+        "source": "com.example.livemedia.app-main-46:/drawable/youtube.xml"
     },
     {
-        "merged": "com.example.livemedia.app-debug-44:/drawable_ic_audio_wave.xml.flat",
-        "source": "com.example.livemedia.app-main-46:/drawable/ic_audio_wave.xml"
+        "merged": "com.example.livemedia.app-debug-44:/drawable_qobuz_com.xml.flat",
+        "source": "com.example.livemedia.app-main-46:/drawable/qobuz_com.xml"
     },
     {
-        "merged": "com.example.livemedia.app-debug-44:/xml_backup_rules.xml.flat",
-        "source": "com.example.livemedia.app-main-46:/xml/backup_rules.xml"
+        "merged": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-debug-44:\\mipmap-hdpi_ic_launcher.xml.flat",
+        "source": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-main-46:\\mipmap-hdpi\\ic_launcher.xml"
     },
     {
-        "merged": "com.example.livemedia.app-debug-44:/mipmap-anydpi-v26_ic_launcher_round.xml.flat",
-        "source": "com.example.livemedia.app-main-46:/mipmap-anydpi-v26/ic_launcher_round.xml"
+        "merged": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-debug-44:\\drawable_ic_pause.xml.flat",
+        "source": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-main-46:\\drawable\\ic_pause.xml"
     },
     {
-        "merged": "com.example.livemedia.app-debug-44:/drawable_ic_launcher_foreground.xml.flat",
-        "source": "com.example.livemedia.app-main-46:/drawable/ic_launcher_foreground.xml"
+        "merged": "com.example.livemedia.app-debug-44:/drawable_apple_music.xml.flat",
+        "source": "com.example.livemedia.app-main-46:/drawable/apple_music.xml"
     },
     {
-        "merged": "com.example.livemedia.app-debug-44:/xml_data_extraction_rules.xml.flat",
-        "source": "com.example.livemedia.app-main-46:/xml/data_extraction_rules.xml"
+        "merged": "com.example.livemedia.app-debug-44:/drawable_telegram.xml.flat",
+        "source": "com.example.livemedia.app-main-46:/drawable/telegram.xml"
     },
     {
-        "merged": "com.example.livemedia.app-debug-44:/mipmap-hdpi_ic_launcher_round.xml.flat",
-        "source": "com.example.livemedia.app-main-46:/mipmap-hdpi/ic_launcher_round.xml"
+        "merged": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-debug-44:\\layout_notification_live_activity.xml.flat",
+        "source": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-main-46:\\layout\\notification_live_activity.xml"
     },
     {
-        "merged": "com.example.livemedia.app-debug-44:/drawable_ic_pause.xml.flat",
-        "source": "com.example.livemedia.app-main-46:/drawable/ic_pause.xml"
+        "merged": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-debug-44:\\mipmap-hdpi_ic_launcher_round.xml.flat",
+        "source": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-main-46:\\mipmap-hdpi\\ic_launcher_round.xml"
     },
     {
-        "merged": "com.example.livemedia.app-debug-44:/mipmap-hdpi_ic_launcher.xml.flat",
-        "source": "com.example.livemedia.app-main-46:/mipmap-hdpi/ic_launcher.xml"
+        "merged": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-debug-44:\\xml_data_extraction_rules.xml.flat",
+        "source": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-main-46:\\xml\\data_extraction_rules.xml"
     },
     {
-        "merged": "com.example.livemedia.app-debug-44:/drawable_progress_bar_bg.xml.flat",
-        "source": "com.example.livemedia.app-main-46:/drawable/progress_bar_bg.xml"
+        "merged": "com.example.livemedia.app-debug-44:/drawable_outline_artist_24.xml.flat",
+        "source": "com.example.livemedia.app-main-46:/drawable/outline_artist_24.xml"
     },
     {
-        "merged": "com.example.livemedia.app-debug-44:/mipmap-anydpi-v26_ic_launcher.xml.flat",
-        "source": "com.example.livemedia.app-main-46:/mipmap-anydpi-v26/ic_launcher.xml"
+        "merged": "com.example.livemedia.app-debug-44:/drawable_play_pause_svgrepo_com.xml.flat",
+        "source": "com.example.livemedia.app-main-46:/drawable/play_pause_svgrepo_com.xml"
+    },
+    {
+        "merged": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-debug-44:\\drawable_ic_launcher_foreground.xml.flat",
+        "source": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-main-46:\\drawable\\ic_launcher_foreground.xml"
+    },
+    {
+        "merged": "com.example.livemedia.app-debug-44:/drawable_tidal.xml.flat",
+        "source": "com.example.livemedia.app-main-46:/drawable/tidal.xml"
+    },
+    {
+        "merged": "com.example.livemedia.app-debug-44:/drawable_twitch.xml.flat",
+        "source": "com.example.livemedia.app-main-46:/drawable/twitch.xml"
+    },
+    {
+        "merged": "com.example.livemedia.app-debug-44:/drawable_youtube_music.xml.flat",
+        "source": "com.example.livemedia.app-main-46:/drawable/youtube_music.xml"
+    },
+    {
+        "merged": "com.example.livemedia.app-debug-44:/drawable_spotify.xml.flat",
+        "source": "com.example.livemedia.app-main-46:/drawable/spotify.xml"
+    },
+    {
+        "merged": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-debug-44:\\xml_backup_rules.xml.flat",
+        "source": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-main-46:\\xml\\backup_rules.xml"
+    },
+    {
+        "merged": "com.example.livemedia.app-debug-44:/drawable_notebook_lm.xml.flat",
+        "source": "com.example.livemedia.app-main-46:/drawable/notebook_lm.xml"
+    },
+    {
+        "merged": "com.example.livemedia.app-debug-44:/drawable_amazon_music.xml.flat",
+        "source": "com.example.livemedia.app-main-46:/drawable/amazon_music.xml"
+    },
+    {
+        "merged": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-debug-44:\\mipmap-anydpi-v26_ic_launcher_round.xml.flat",
+        "source": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-main-46:\\mipmap-anydpi-v26\\ic_launcher_round.xml"
+    },
+    {
+        "merged": "com.example.livemedia.app-debug-44:/drawable_previous_svgrepo_com.xml.flat",
+        "source": "com.example.livemedia.app-main-46:/drawable/previous_svgrepo_com.xml"
+    },
+    {
+        "merged": "com.example.livemedia.app-debug-44:/drawable_soundcloud.xml.flat",
+        "source": "com.example.livemedia.app-main-46:/drawable/soundcloud.xml"
+    },
+    {
+        "merged": "com.example.livemedia.app-debug-44:/drawable_usb_audio_player_pro.xml.flat",
+        "source": "com.example.livemedia.app-main-46:/drawable/usb_audio_player_pro.xml"
+    },
+    {
+        "merged": "com.example.livemedia.app-debug-44:/drawable_netflix.xml.flat",
+        "source": "com.example.livemedia.app-main-46:/drawable/netflix.xml"
+    },
+    {
+        "merged": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-debug-44:\\drawable_progress_bar_funky.xml.flat",
+        "source": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-main-46:\\drawable\\progress_bar_funky.xml"
+    },
+    {
+        "merged": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-debug-44:\\drawable_ic_launcher_monochrome.xml.flat",
+        "source": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-main-46:\\drawable\\ic_launcher_monochrome.xml"
+    },
+    {
+        "merged": "com.example.livemedia.app-debug-44:/drawable_next_svgrepo_com.xml.flat",
+        "source": "com.example.livemedia.app-main-46:/drawable/next_svgrepo_com.xml"
+    },
+    {
+        "merged": "com.example.livemedia.app-debug-44:/drawable_deezer.xml.flat",
+        "source": "com.example.livemedia.app-main-46:/drawable/deezer.xml"
+    },
+    {
+        "merged": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-debug-44:\\drawable_progress_bar_bg.xml.flat",
+        "source": "C:\\Users\\shriy\\.gradle\\daemon\\9.0-milestone-1\\com.example.livemedia.app-main-46:\\drawable\\progress_bar_bg.xml"
     }
 ]
