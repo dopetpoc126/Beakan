@@ -2,11 +2,7 @@
 
 **Your notifications, reimagined.**
 
-<div align="center">
-  <img src="app/src/main/ic_launcher-playstore.png" alt="Beakan Logo" width="120" style="border-radius: 20px"/>
-  <br/>
-  <br/>
-  
+<div align="center">  
   [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.0-purple.svg?style=flat&logo=kotlin)](https://kotlinlang.org)
   [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-M3-green.svg?style=flat&logo=android)](https://developer.android.com/jetpack/compose)
   [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
