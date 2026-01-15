@@ -42,5 +42,6 @@ string select_apps
 string service_name
 style RoundedIcon
 style Theme.LiveMediaActivities
+xml accessibility_service_config
 xml backup_rules
 xml data_extraction_rules

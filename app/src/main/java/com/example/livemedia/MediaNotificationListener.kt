@@ -18,15 +18,21 @@ import kotlinx.coroutines.*
 import com.example.livemedia.utils.PillContent 
 import com.example.livemedia.utils.providePillText
 import com.example.livemedia.utils.getAppName
+import com.example.livemedia.lockscreen.LockScreenManager
 
 class MediaNotificationListener : NotificationListenerService() {
 
     private val logger = Logger("MediaNotificationListener")
+    private lateinit var prefs: AppPreferences
     private lateinit var publisher: NotificationPublisher
     
     // Media Manager
     private lateinit var mediaStateManager: MediaStateManager
     private var lastMediaState: MusicState? = null
+    
+    // Visibility Managers
+    private lateinit var lockScreenManager: LockScreenManager
+    private var isQsOpen = false
     
     // Handlers
     private lateinit var torchHandler: TorchHandler
@@ -54,6 +60,12 @@ class MediaNotificationListener : NotificationListenerService() {
             // Handle Media Actions via Manager
             mediaStateManager.handleTransportControl(action)
             
+            if (action == "com.example.livemedia.ACTION_REFRESH_MEDIA_UI") {
+                logger.info("Refreshing Media UI from Settings")
+                updateLiveActivity()
+                return
+            }
+
             if (action == NotificationPublisher.ACTION_NOTIFICATION_DISMISSED) {
                 // User dismissed notification
                 // If media is playing, maybe we shouldn't dismiss?
@@ -74,7 +86,29 @@ class MediaNotificationListener : NotificationListenerService() {
         super.onCreate()
         logger.info("onCreate")
         
+        prefs = AppPreferences(this)
         publisher = NotificationPublisher(this)
+        
+        // Initialize Visibility Managers
+        lockScreenManager = com.example.livemedia.lockscreen.LockScreenManager(
+            this,
+            deviceLocked = { 
+                logger.info("Device Locked -> Update")
+                updateLiveActivity() 
+            },
+            deviceUnlocked = { 
+                logger.info("Device Unlocked -> Update")
+                updateLiveActivity() 
+            }
+        )
+        
+        serviceScope.launch {
+            com.example.livemedia.qs.QSStateProvider.isQsOpen.collect { isOpen ->
+                isQsOpen = isOpen
+                logger.info("QS Open: $isOpen -> Update")
+                updateLiveActivity()
+            }
+        }
         
         // Initialize Media Manager
         mediaStateManager = MediaStateManager(
@@ -102,6 +136,7 @@ class MediaNotificationListener : NotificationListenerService() {
             addAction(MediaStateManager.ACTION_SKIP_TO_NEXT)
             addAction(MediaStateManager.ACTION_SKIP_TO_PREVIOUS)
             addAction(NotificationPublisher.ACTION_NOTIFICATION_DISMISSED)
+            addAction("com.example.livemedia.ACTION_REFRESH_MEDIA_UI")
         }
         registerReceiver(actionReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
         
@@ -117,6 +152,7 @@ class MediaNotificationListener : NotificationListenerService() {
     override fun onDestroy() {
         serviceScope.cancel()
         unregisterReceiver(actionReceiver)
+        lockScreenManager.unregister()
         torchHandler.cleanup()
         otpHandler.cleanup()
         downloadHandler.cleanup()
@@ -127,26 +163,21 @@ class MediaNotificationListener : NotificationListenerService() {
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         if (sbn.packageName == packageName) return
         
-        otpHandler.onNotificationPosted(sbn)
-        downloadHandler.onNotificationPosted(sbn)
+        if (prefs.isOtpEnabled) otpHandler.onNotificationPosted(sbn)
+        if (prefs.isDownloadEnabled) downloadHandler.onNotificationPosted(sbn)
         
-        // Media manager handles its own finding via callbacks, but we need to prompt it?
-        // Actually MediaStateManager uses MediaSessionManager.getActiveSessions.
-        // But onNotificationPosted for a media app *might* trigger a session refresh if needed.
-        // LiveMedia's NotificationViewModel calls mediaStateManager.maybeUpdateMediaController() on POST of MEDIA transport notif.
-        
-        // Check if it's a media notification to trigger update
-        if (sbn.notification.extras.containsKey(android.app.Notification.EXTRA_MEDIA_SESSION)) {
+        // Media check
+        if (prefs.isMediaEnabled && sbn.notification.extras.containsKey(android.app.Notification.EXTRA_MEDIA_SESSION)) {
              mediaStateManager.maybeUpdateMediaController()
         }
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         // Delegate
-        downloadHandler.onNotificationRemoved(sbn)
+        if (prefs.isDownloadEnabled) downloadHandler.onNotificationRemoved(sbn)
         
         // Media manager check
-        if (sbn.packageName == lastMediaState?.packageName) {
+        if (prefs.isMediaEnabled && sbn.packageName == lastMediaState?.packageName) {
              // Maybe it was removed?
              handler.postDelayed({ mediaStateManager.maybeUpdateMediaController() }, 500)
         }
@@ -154,31 +185,56 @@ class MediaNotificationListener : NotificationListenerService() {
     
     private fun updateLiveActivity() {
         serviceScope.launch(Dispatchers.Main) {
-             // 1. Torch (High Priority)
-            val torchState = torchHandler.getCurrentState()
-            if (torchState != null) {
-                publishGenericState(torchState)
+            // Visibility Checks
+            // If screen is locked AND lockscreen setting is OFF -> Hide
+            if (!lockScreenManager.isScreenUnlocked() && !prefs.showOnLockscreen) {
+                logger.info("Screen locked + setting off -> hide")
+                publisher.cancelNotification()
+                // Do not proceed
                 return@launch
+            }
+            
+            if (isQsOpen) {
+                logger.info("QS open, hiding notification")
+                publisher.cancelNotification()
+                return@launch
+            }
+
+             // 1. Torch (High Priority)
+            if (prefs.isTorchEnabled) {
+                val torchState = torchHandler.getCurrentState()
+                if (torchState != null) {
+                    publishGenericState(torchState)
+                    return@launch
+                }
             }
             
             // 2. OTP
-             val otpState = otpHandler.getCurrentState()
-            if (otpState != null) {
-                publishGenericState(otpState)
-                return@launch
+             if (prefs.isOtpEnabled) {
+                val otpState = otpHandler.getCurrentState()
+                if (otpState != null) {
+                    publishGenericState(otpState)
+                    return@launch
+                }
             }
             
             // 3. Download
-            val downloadState = downloadHandler.getCurrentState()
-            if (downloadState != null) {
-                publishGenericState(downloadState)
-                return@launch
+            if (prefs.isDownloadEnabled) {
+                val downloadState = downloadHandler.getCurrentState()
+                if (downloadState != null) {
+                    publishGenericState(downloadState)
+                    return@launch
+                }
             }
             
             // 4. Media
-            val mediaState = lastMediaState
-            if (mediaState != null) {
-                publishMediaState(mediaState)
+            if (prefs.isMediaEnabled) {
+                val mediaState = lastMediaState
+                if (mediaState != null) {
+                    publishMediaState(mediaState)
+                } else {
+                    publisher.cancelNotification()
+                }
             } else {
                 publisher.cancelNotification()
             }
@@ -220,7 +276,7 @@ class MediaNotificationListener : NotificationListenerService() {
             position = state.position.toInt(),
             duration = state.duration.toInt(),
             isPlaying = state.isPlaying,
-            pillContent = pillContent,
+            pillContent = PillContent.TITLE,
             isScrollEnabled = isScrollEnabled,
             elapsedTimeMs = System.currentTimeMillis() - titleStartTime
         )
@@ -236,30 +292,35 @@ class MediaNotificationListener : NotificationListenerService() {
         // If we want custom buttons (Play/Pause), we need to generate them here.
         // LiveMedia NotificationViewModel generates them.
         
+        // Build Actions (Only if enabled)
         val actions = mutableListOf<android.app.Notification.Action>()
-        
-        // Prev
-        actions.add(createAction("Prev", MediaStateManager.ACTION_SKIP_TO_PREVIOUS))
-        
-        // Play/Pause
-        val playPauseAction = if (state.isPlaying) MediaStateManager.ACTION_PLAY_PAUSE else MediaStateManager.ACTION_PLAY_PAUSE 
-        // Logic check: The action string is same, but Icon/Label differs. 
-        // Wait, NotificationViewModel uses Lazy vals for these.
-        // My NotificationPublisher handles Icon/Label if I pass generic actions? 
-        // No, NotificationPublisher receives already built Actions.
-        // I need to build them.
-        
-        actions.add(createAction(if (state.isPlaying) "Pause" else "Play", MediaStateManager.ACTION_PLAY_PAUSE))
-        
-        // Next
-        actions.add(createAction("Next", MediaStateManager.ACTION_SKIP_TO_NEXT))
+        if (prefs.showActionButtons) {
+             actions.add(createAction("Prev", MediaStateManager.ACTION_SKIP_TO_PREVIOUS))
+             actions.add(createAction(if (state.isPlaying) "Pause" else "Play", MediaStateManager.ACTION_PLAY_PAUSE))
+             actions.add(createAction("Next", MediaStateManager.ACTION_SKIP_TO_NEXT))
+        }
         
         
+        
+        // Prepare Data based on flags
+        val showAlbumArt = prefs.showAlbumArt
+        val showArtist = prefs.showArtistName
+        val showAlbum = prefs.showAlbumName
+        val showProgress = prefs.showProgress
+        val showProvider = prefs.showMusicProvider
+        
+        val finalArtist = if (showArtist) state.artist else ""
+        
+        val finalBitmap = if (showAlbumArt) state.albumArt else null
+        val finalSmallIcon = if (showProvider) smallIcon else null
+        val finalDuration = if (showProgress) state.duration else -1L
+        val finalPosition = if (showProgress) state.position else -1L
+
         publisher.updateNotification(
             notificationId = NotificationPublisher.BASE_NOTIFICATION_ID,
             title = state.title,
-            artist = state.artist, // You might want to use BuildArtistAlbumTitle here
-            bitmap = state.albumArt, // Note: MusicState has albumArt (Bitmap) and albumArtUri.
+            artist = finalArtist,
+            bitmap = finalBitmap,
             token = null, // We aren't using MediaSession.Token directly for controls anymore? 
                           // Actually Android 13+ wants the token for the media controls to show up on lockscreen properly?
                           // NotificationPublisher needs token? 
@@ -279,11 +340,11 @@ class MediaNotificationListener : NotificationListenerService() {
             actions = actions,
             sourcePackage = state.packageName,
             launchIntent = null, // Publisher handles it
-            duration = state.duration,
-            position = state.position,
+            duration = finalDuration,
+            position = finalPosition,
             overrideChipText = chipText,
             skipMediaFilter = true, // We are providing exact actions (Prev, Play, Next)
-            smallIconResId = smallIcon
+            smallIconResId = finalSmallIcon
         )
     }
     

@@ -103,7 +103,7 @@ fun providePillText(
     isScrollEnabled: Boolean,
     elapsedTimeMs: Long
 ): String {
-    val showTime = isPlaying && duration > 0
+    val showTime = duration > 0
 
     if (pillContent == PillContent.ELAPSED && showTime) return formatTime(position)
     if (pillContent == PillContent.REMAINING && showTime) return formatTime(duration - position)

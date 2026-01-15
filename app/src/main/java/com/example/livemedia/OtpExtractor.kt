@@ -19,12 +19,20 @@ object OtpExtractor {
 
     // --- Regex Stages ---
 
-    // 1) KEYWORD-ANCHORED OTP (PRIMARY — RUN FIRST)
-    // Matches keyword + 0-40 any chars (lazy) + Code (4-8 digits)
-    // FIX: Changed from [^\dA-Z]{0,40} to .{0,40}? because CASE_INSENSITIVE 
-    // makes [A-Z] reject lowercase letters like 'is' in "OTP is 433502"
+    // 0) REVERSE KEYWORD ANCHORED (HIGHEST PRIORITY)
+    // Matches Code (4-8 digits) + 0-40 chars + Keyword
+    // Example: "123456 is your verification code"
+    // Using lookbehind-like logic, but implemented as forward regex: (\d) ... (keyword)
+    private val STAGE_0_REVERSE_ANCHORED = Pattern.compile(
+        "\\b(\\d{4,8})\\b.{0,40}?(?:$KEYWORDS)", 
+        FLAGS
+    )
+
+    // 1) KEYWORD-ANCHORED OTP (PRIMARY)
+    // Matches Keyword + 0-40 chars + Code (4-8 digits)
+    // FIX: Added (?!\d) to prevent matching first 8 digits of a phone number.
     private val STAGE_1_KEYWORD_ANCHORED = Pattern.compile(
-        "(?:$KEYWORDS).{0,40}?(\\d{4,8})", 
+        "(?:$KEYWORDS).{0,40}?(\\d{4,8})(?!\\d)", 
         FLAGS
     )
 
@@ -36,23 +44,20 @@ object OtpExtractor {
     )
 
     // 3) SECONDARY BROAD OTP CATCHER (LAST RESORT)
-    // Matches various formats if surrounded by validation boundaries
-    // FIX: Removed pure alphabetic matching to avoid capturing words like "CLICK", "HERE", "TRUE".
-    // FIX: Alphanumeric and Hex must now contain at least one digit.
     private val STAGE_3_BROAD = Pattern.compile(
         "(?<!\\w)(" +
         "\\d{4,8}|" +                       // numeric
-        "(?![A-Z]+\\b)[A-Z0-9]{4,10}|" +    // alphanumeric (Negative lookahead: NOT pure alpha)
-        "\\d{3}[-\\s]\\d{3}|" +             // grouped numeric (123-456)
-        "\\d{2}[-\\s]\\d{2}[-\\s]\\d{2}|" + // grouped (12-34-56)
-        "(?:\\d\\s){3,7}\\d" +              // spaced digits (1 2 3 4 5 6)
+        "(?![A-Z]+\\b)[A-Z0-9]{4,10}|" +    // alphanumeric
+        "\\d{3}[-\\s]\\d{3}|" +             // grouped numeric
+        "\\d{2}[-\\s]\\d{2}[-\\s]\\d{2}|" + // grouped
+        "(?:\\d\\s){3,7}\\d" +              // spaced digits
         ")(?!\\w)", 
         FLAGS
     )
 
     // 4) OPTIONAL KEYWORD + NUMERIC PREFIX FORM
     private val STAGE_4_PREFIX = Pattern.compile(
-        "(?:otp|code|pin|pass)\\s*[:\\-]?\\s*(\\d{4,8})", 
+        "(?:otp|code|pin|pass)\\s*[:\\-]?\\s*(\\d{4,8})(?!\\d)", 
         FLAGS
     )
 
@@ -62,12 +67,13 @@ object OtpExtractor {
         try {
             val cleanText = text.trim()
             
-            // Run logical stages. Order implies priority.
-            
+            // Stage 0: Reverse Anchored (New High Confidence)
+            findMatch(STAGE_0_REVERSE_ANCHORED, cleanText)?.let { return it }
+
             // Stage 1: Keyword Anchored (High Confidence)
             findMatch(STAGE_1_KEYWORD_ANCHORED, cleanText)?.let { return it }
     
-            // Stage 4: Prefix (High Confidence specific form) - Moved up as it's specific
+            // Stage 4: Prefix (High Confidence specific form)
             findMatch(STAGE_4_PREFIX, cleanText)?.let { return it }
     
             // Stage 2: Strict Numeric (Medium Confidence)
@@ -91,7 +97,7 @@ object OtpExtractor {
         while (matcher.find()) {
             // Some patterns have capturing groups, others match the whole group 1/0
             val candidate = if (matcher.groupCount() >= 1) matcher.group(1) else matcher.group(0)
-            val fullMatch = matcher.group(0)
+            val fullMatch = matcher.group(0) ?: ""
             val start = matcher.start()
             
             if (candidate != null && passesPostFilters(candidate, text, start, fullMatch)) {
