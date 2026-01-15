@@ -287,16 +287,19 @@ fun SplashScreen(onComplete: () -> Unit) {
             }
         }
 
-        // --- FINAL TITLE ---
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.alpha(textAlpha.value)
+        // --- FINAL TITLE (Precisely Centered) ---
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .alpha(textAlpha.value),
+            contentAlignment = Alignment.Center
         ) {
             Text(
                 "Beakan",
                 style = MaterialTheme.typography.displayMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center
             )
         }
     }
@@ -348,7 +351,7 @@ fun MainContent() {
         ) {
             // Header Row (Simple Title)
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = 48.dp),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {

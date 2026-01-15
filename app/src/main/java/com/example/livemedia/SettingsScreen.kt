@@ -38,8 +38,6 @@ fun SettingsScreen(onBack: () -> Unit) {
     var isDownloadEnabled by remember { mutableStateOf(prefs.isDownloadEnabled) }
     var isTorchEnabled by remember { mutableStateOf(prefs.isTorchEnabled) }
     
-    // Visibility
-    var showOnLockscreen by remember { mutableStateOf(prefs.showOnLockscreen) }
 
     // Detailed Media Settings
     var showAlbumArt by remember { mutableStateOf(prefs.showAlbumArt) }
@@ -160,29 +158,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                 }
             }
 
-            // 4. VISIBILITY
-            SettingsSection(title = "Visibility") {
-                SettingSwitch(
-                    title = "Show on Lock Screen",
-                    subtitle = "Keep visible when locked",
-                    icon = Icons.Rounded.Lock, 
-                    checked = showOnLockscreen,
-                    onCheckedChange = { 
-                        showOnLockscreen = it
-                        prefs.showOnLockscreen = it 
-                    }
-                )
-                 SettingSwitch(
-                    title = "Hide on Quick Settings",
-                    subtitle = "Hide when notification shade is open",
-                    icon = Icons.Default.Warning, 
-                    checked = hideOnQs,
-                    onCheckedChange = { 
-                        hideOnQs = it
-                        prefs.hideOnQs = it 
-                    }
-                )
-            }
+
             
              // Helpful Footer
             Text(
